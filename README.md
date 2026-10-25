@@ -1616,3 +1616,153 @@ is one coherent application in which the modules work together, state
 changes are persisted and validated, deadlines and compliance are
 traceable, official decisions remain under authorised human control, and
 the BPMN showcase matches the implemented workflow.**
+
+------------------------------------------------------------------------
+
+## 23. Member 1 (Frontend Lead) — Frontend Implementation & Local Run Guide
+
+### 23.1 Overview & Architecture
+
+As Member 1 (Frontend Lead), the shared frontend application shell, design system, dashboard, application list and detail views, application intake form, and integration mock adapters have been fully implemented in the root of the repository without introducing unauthorized frameworks or breaking changes to existing documentation.
+
+- **Stack:** React 18, Vite, TypeScript, Normal CSS with institutional design tokens (Zero Tailwind CSS, zero Next.js), React Router v6, Recharts v2, Lucide React, React Hook Form with Zod validation.
+- **Reference Design Migration:** Faithfully migrated from `reference.html.html` with custom CSS variables (`--bg`, `--surface`, `--accent`, `--ink`, `--green-ink`, `--amber-ink`, `--red-ink`), card elevations, accessible focus rings, responsive drawer/rail layout, and typography.
+- **Local Persistence & Reactivity:** Backed by `src/data/mockStore.ts` and `src/hooks/useStore.ts`, allowing instant interactive workflow state transitions, deficiency logging, stage advancement, and audit events while keeping an interchangeable API client adapter (`src/api/client.ts`).
+
+### 23.2 Prerequisites & Local Execution
+
+Prerequisites:
+- Node.js `v18.0.0` or higher (verified on Node `v24.14.0`)
+- npm `v9.0.0` or higher (verified on npm `11.9.0`)
+
+Exact Commands:
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Run local development server (starts on http://127.0.0.1:3000)
+npm run dev
+
+# 3. Type-check & lint
+npm run lint
+
+# 4. Production build test
+npm run build
+
+# 5. Preview production build locally
+npm run preview
+```
+
+### 23.3 Implemented Directory Structure
+
+```text
+AICTE-Approval-Frontend/
+├── index.html                  # HTML entry with font preconnects and favicon
+├── package.json                # Dependencies and scripts (dev, build, lint, preview)
+├── tsconfig.json               # TypeScript strict configuration
+├── tsconfig.node.json          # Vite node runner config
+├── vite.config.ts              # Vite server port 3000 and React plugin
+├── public/
+│   └── favicon.svg             # Institutional SVG mark
+├── src/
+│   ├── main.tsx                # Mount point with StrictMode
+│   ├── App.tsx                 # Route mapping inside AppShell
+│   ├── types/
+│   │   └── index.ts            # Central interfaces: Application, EVC, Document, Audit, Stage
+│   ├── styles/
+│   │   ├── tokens.css          # Color palettes, typography, elevations, radii
+│   │   ├── layout.css          # AppShell, responsive sidebar, topbar, breakpoints
+│   │   └── index.css           # Buttons, cards, badges, tables, modals, toast, skeletons
+│   ├── data/
+│   │   ├── mockApplications.ts # Seed institutional cases with illustrative routes
+│   │   ├── mockDocuments.ts    # Compliance documents with expiry dates & version numbers
+│   │   ├── mockEvcs.ts         # Committee inspections with assigned members & dates
+│   │   ├── mockNotifications.ts# Reminders, alerts, and escalation events
+│   │   ├── mockAudit.ts        # Immutable timestamped audit log
+│   │   └── mockStore.ts        # In-memory reactive state manager with audit log hooks
+│   ├── hooks/
+│   │   └── useStore.ts         # React hook for reactive store subscription
+│   ├── api/
+│   │   └── client.ts           # Shared typed API client with mock toggle and backend endpoints
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Badge.tsx       # Semantic status badges (blue, green, amber, red, gray)
+│   │   │   ├── Button.tsx      # Primary, secondary, ghost, danger buttons with loading states
+│   │   │   ├── Card.tsx        # Card & CardHeader containers
+│   │   │   ├── Modal.tsx       # Accessible dialog with backdrop and escape key handler
+│   │   │   ├── Stepper.tsx     # 6-stage workflow stepper with active/done states
+│   │   │   ├── Toast.tsx       # Reactive toast dispatcher and floating container
+│   │   │   ├── Skeleton.tsx    # Shimmer loading skeleton
+│   │   │   └── EmptyState.tsx  # Resilient empty views with recovery action
+│   │   └── layout/
+│   │       ├── AppShell.tsx    # Main shell wrapping navigation, topbar, and disclaimers
+│   │       ├── Sidebar.tsx     # Primary navigation with unread notification badge
+│   │       ├── Topbar.tsx      # Breadcrumbs, cycle banner, and persona trigger
+│   │       └── RoleSwitcherModal.tsx # Simulated demo role switcher modal
+│   └── pages/
+│       ├── DashboardPage.tsx       # Overview KPI cards, Recharts ageing graph, stage tracks
+│       ├── ApplicationsListPage.tsx# Table, search, status filters, saved views, pagination, bulk actions
+│       ├── ApplicationDetailPage.tsx# Details, stepper, deficiency review, checklist, official decision
+│       ├── ApplicationIntakePage.tsx# Intake form with Zod validation, unsaved edit safeguards
+│       ├── EvcManagementPage.tsx   # EVC list & calendar view, assign committee, reschedule
+│       ├── CompliancePage.tsx      # Document inventory, validity filters, undertaking submission
+│       ├── NotificationsPage.tsx   # Notification feed, mark read/unread, preferences
+│       ├── AuditHistoryPage.tsx    # Complete audit event log, search, and CSV export
+│       └── NotFoundPage.tsx        # 404 handler
+├── reference.html.html         # Teammate reference preserved strictly unchanged
+└── README.md                   # Shared team documentation
+```
+
+### 23.4 Reusable Components Summary
+
+| Component | Path | Purpose |
+| :--- | :--- | :--- |
+| `AppShell` | `src/components/layout/AppShell.tsx` | Consistent navigation, responsive drawer, profile avatar, and disclaimer footer |
+| `Badge` | `src/components/common/Badge.tsx` | Status tags with automatic tone detection (`Approved`, `Deficiency raised`, `Pending scrutiny`) |
+| `Button` | `src/components/common/Button.tsx` | Keyboard-accessible buttons supporting variants (`primary`, `secondary`, `ghost`, `danger`), spinners, and icons |
+| `Card` | `src/components/common/Card.tsx` | Styled institutional surface cards with standardized header & action layouts |
+| `Modal` | `src/components/common/Modal.tsx` | Accessible dialogs with Escape listener, focus isolation, backdrop dismiss, and form integration |
+| `Stepper` | `src/components/common/Stepper.tsx` | 6-stage linear approval indicator visualizing progression from `Submitted` to `Appeal/Post-approval` |
+| `Toast` | `src/components/common/Toast.tsx` | Non-blocking operational notifications (`success`, `info`, `error`) |
+| `Skeleton` | `src/components/common/Skeleton.tsx` | Loading shimmers used during asynchronous state simulation |
+| `EmptyState`| `src/components/common/EmptyState.tsx` | Professional empty states with descriptive guidance and recovery actions |
+| `RoleSwitcherModal` | `src/components/layout/RoleSwitcherModal.tsx` | Simulated persona selector (Scrutiny Officer, Competent Authority, EVC Lead, Applicant) |
+
+### 23.5 Backend API Assumptions & Integration Contract
+
+All backend endpoints defined in Section 9.1 of this README are wired via `src/api/client.ts`. When Member 3 and Member 4 start the FastAPI backend, set `VITE_API_URL` to toggle from local mock store to HTTP fetch:
+
+1. `GET /api/dashboard/summary` — Returns KPI counts, stage distributions, and ageing buckets.
+2. `GET /api/applications` — Returns portfolio list with ID, category, stage, status, owner, and deadline.
+3. `POST /api/applications` — Ingests new intake with validated fields and returns registered case file.
+4. `GET /api/applications/{id}` — Returns full case metadata, document checklist, and route assignment.
+5. `POST /api/applications/{id}/transition` — Accepts `{ action, reason, outcome? }` and enforces transition rules server-side.
+6. `GET /api/evcs` — Lists inspection records, committee members, and evidence filenames.
+7. `GET /api/documents` — Lists compliance documents with expiry dates and version history.
+8. `GET /api/notifications` — Lists in-app deadline and deficiency alerts.
+9. `GET /api/audit-logs` — Returns append-only transition audit events.
+
+### 23.6 Member 1 Handover & Branch Push Checklist
+
+For Member 1 to safely review, commit, and push on their own branch:
+
+```bash
+# 1. Verify working directory status
+git status
+
+# 2. Create and switch to your feature branch
+git checkout -b feature/member-1-frontend-shell
+
+# 3. Add the newly created frontend files
+git add package.json package-lock.json tsconfig.json tsconfig.node.json vite.config.ts index.html public/ src/ README.md
+
+# 4. Verify that existing reference files and unrelated projects were not modified
+git status
+
+# 5. Commit with a descriptive message
+git commit -m "feat(frontend): implement shared application shell, dashboard, applications list, detail view, intake form, and design tokens"
+
+# 6. Push to your own branch on the remote repository
+git push -u origin feature/member-1-frontend-shell
+```

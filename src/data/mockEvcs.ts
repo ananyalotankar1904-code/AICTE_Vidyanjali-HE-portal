@@ -1,0 +1,48 @@
+import { EvcRecord } from '../types';
+
+export const seedEvcs: EvcRecord[] = [
+  {
+    id: 'EVC-301',
+    app: 'AI-2026-1794',
+    date: '2026-11-07',
+    mode: 'On-site',
+    members: 'Dr Meera Shah, Prof. S. Iyer',
+    status: 'Scheduled',
+    evidence: 'Not uploaded',
+    scheduledTime: '10:00 AM IST',
+    reportNotes: 'Inspection team notified. Physical lab facilities inspection scheduled.',
+  },
+  {
+    id: 'EVC-302',
+    app: 'AI-2026-1711',
+    date: '2026-10-21',
+    mode: 'Virtual',
+    members: 'Dr A. Kulkarni, Prof. N. Bose',
+    status: 'Completed',
+    evidence: 'Inspection_report_JCAS_2026.pdf',
+    scheduledTime: '02:30 PM IST',
+    reportNotes: 'Virtual verification completed. Geotagged lab evidence verified.',
+  },
+  {
+    id: 'EVC-303',
+    app: 'AI-2026-1763',
+    date: '2026-11-13',
+    mode: 'On-site',
+    members: 'Assignment pending',
+    status: 'Awaiting assignment',
+    evidence: 'Not uploaded',
+    scheduledTime: '11:00 AM IST',
+    reportNotes: 'Committee panel nominations in progress by Regional Office.',
+  },
+  {
+    id: 'EVC-304',
+    app: 'AI-2026-1778',
+    date: '2026-10-14',
+    mode: 'Virtual',
+    members: 'Dr M. Gupta, Prof. P. Rao',
+    status: 'Completed',
+    evidence: 'Inspection_report_AID_2026.pdf',
+    scheduledTime: '11:30 AM IST',
+    reportNotes: 'Studio workshops and faculty interactive session recorded.',
+  },
+];

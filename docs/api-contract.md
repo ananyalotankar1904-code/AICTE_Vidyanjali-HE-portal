@@ -1,349 +1,344 @@
-# API Contract: Backend Compliance, EVC, Documents, Deadlines & Notifications
+# SIH26262 — Unified System API Contract
 
-**Author:** Member 4 — Backend Compliance Developer  
-**Status:** Implemented & Tested  
-**Base URL:** `/api`  
-
-All requests and responses use JSON and ISO 8601 timestamps. Role-restricted endpoints accept authentication headers (or demo headers: `X-User-Id` and `X-User-Role`).
-
----
-
-## 1. Shared Enums
-
-### Roles (`X-User-Role`)
-- `APPLICANT`: Institution representative
-- `SCRUTINY_OFFICER`: Technical scrutiny officer
-- `EVC_TEAM`: Expert Visit Committee member / Convener
-- `COMMITTEE_MEMBER`: Standing Approval Committee member
-- `COMPLIANCE_OFFICER`: Compliance & Undertaking Verification Officer
-- `COMPETENT_AUTHORITY`: Regional Officer / Statutory Decision Authority
-- `ADMIN`, `SYSTEM`
-
-### Lifecycles
-- **EVC Status:** `PENDING_SCHEDULING`, `SCHEDULED`, `VISIT_COMPLETED`, `REPORT_SUBMITTED`, `REPORT_REVIEWED`
-- **EVC Recommendation:** `RECOMMENDED`, `DEFICIENCIES_NOTED`, `NOT_RECOMMENDED`
-- **EVC Review Outcome:** `ACCEPTED`, `CLARIFICATION_REQUESTED`
-- **Obligation Status:** `PENDING`, `SUBMITTED`, `NEEDS_CORRECTION`, `VERIFIED`
-- **Document Review Status:** `PENDING_REVIEW`, `VERIFIED`, `NEEDS_REPLACEMENT`, `REJECTED`
-- **Deadline Status:** `ACTIVE`, `COMPLETED`, `CANCELLED`, `OVERDUE`
-- **Notification Types:** `DEADLINE_UPCOMING`, `DEADLINE_OVERDUE`, `ESCALATION_ALERT`, `DOCUMENT_EXPIRING`, `DOCUMENT_EXPIRED`, `EVC_SCHEDULED`, `EVC_RESCHEDULED`, `EVC_REPORT_SUBMITTED`, `OBLIGATION_ACTION_REQUIRED`, `OBLIGATION_VERIFIED`
+**System:** AICTE Approval Workflow Automation & Regulatory Compliance Platform  
+**Status:** Unified API Specification (Phase 1 Baseline)  
+**Base URL:** `http://localhost:8000/api`  
+**Protocol:** REST / JSON  
+**Encoding:** UTF-8, ISO 8601 Timestamps (`YYYY-MM-DDTHH:MM:SSZ` or `YYYY-MM-DD`)  
 
 ---
 
-## 2. Expert Visit Committee (EVC) Endpoints
+## 1. Authentication & Role Headers
+
+Authentication is simplified for the localhost hackathon prototype. All role-restricted endpoints accept demo headers:
+
+| Header Name | Type | Description | Permitted Values |
+|---|---|---|---|
+| `X-User-Id` | String | Unique actor identifier | e.g. `INST_ADMIN_1`, `SCRUT_01`, `CA_MEMBER_01`, `EVC_COORD_1` |
+| `X-User-Role` | String | Active authorization role | `Institution Admin`, `Intake Officer`, `Scrutiny Officer`, `EVC Coordinator`, `EVC Team`, `Committee Member`, `Competent Authority Secretariat`, `Compliance Officer`, `Admin` |
+
+### Role Hierarchy & Responsibilities:
+- **`Institution Admin` / `APPLICANT`:** Submit applications, respond to deficiencies, submit undertaking evidence, submit renewal documents.
+- **`Intake Officer`:** Receive new submissions, verify basic required fields, assign to scrutiny queue.
+- **`Scrutiny Officer`:** Conduct technical scrutiny, raise specific deficiency clauses, review resubmissions.
+- **`EVC Coordinator` / `EVC Team`:** Schedule physical/virtual inspection visits, record visit findings, submit inspection reports.
+- **`Committee Member`:** Review Standing Approval Committee (SAC) cases, record recommendations.
+- **`Competent Authority Secretariat`:** **Exclusively authorized** to record official approval, rejection, or conditional grant decisions.
+- **`Compliance Officer`:** Verify undertakings and post-approval regulatory conditions.
+- **`Admin`:** Super-user role with global permissions for demo administration.
+
+---
+
+## 2. Global Error Response Standard
+
+All endpoints return a uniform error object when requests fail:
+
+```json
+{
+  "error": {
+    "code": "INVALID_TRANSITION",
+    "message": "This action is not permitted from current stage 'DEFICIENCY_RAISED'.",
+    "details": {
+      "current_stage": "DEFICIENCY_RAISED",
+      "attempted_action": "SUBMIT_TO_COMMITTEE",
+      "required_action": "SUBMIT_DEFICIENCY_RESPONSE"
+    }
+  }
+}
+```
+
+### Standard Status Codes:
+- `200 OK`: Request succeeded.
+- `201 Created`: Resource successfully created.
+- `400 Bad Request`: Validation failure or illegal state-machine transition.
+- `403 Forbidden`: Authenticated actor does not have the required role for this action.
+- `404 Not Found`: Target entity ID does not exist.
+- `422 Unprocessable Entity`: Request body failed schema validation.
+
+---
+
+## 3. Workflow & Application Endpoints (Member 3)
+
+### `GET /api/applications`
+- **Description:** List institutional applications with multi-criteria filtering.
+- **Query Parameters:**
+  - `stage` (string, optional): e.g. `SUBMITTED`, `INITIAL_SCRUTINY`, `DEFICIENCY_RAISED`, `RE_SCRUTINY`, `EVC_SCHEDULED`, `COMMITTEE_REVIEW`, `DECISION_PENDING`, `COMPLETED`
+  - `status` (string, optional): `IN_PROGRESS`, `ACTION_REQUIRED`, `COMPLETED`
+  - `institution_id` (string, optional): e.g. `INST001`
+  - `assigned_role` (string, optional): Filter by assigned queue
+  - `deadline_condition` (string, optional): `ON_TRACK`, `UPCOMING`, `OVERDUE`, `DUE_TODAY`
+  - `limit` (int, default: 50)
+  - `offset` (int, default: 0)
+- **Response `200 OK`:**
+  ```json
+  {
+    "items": [
+      {
+        "application_id": "APP001",
+        "institution_id": "INST001",
+        "application_type": "Extension of Approval",
+        "current_stage": "INITIAL_SCRUTINY",
+        "application_status": "IN_PROGRESS",
+        "submitted_date": "2026-10-13",
+        "stage_entered_date": "2026-10-14",
+        "due_date": "2026-11-04",
+        "assigned_role": "Scrutiny Officer",
+        "deficiency_flag": "No",
+        "last_updated": "2026-10-25",
+        "data_type": "SYNTHETIC_DEMO",
+        "deadline_condition": "ON_TRACK",
+        "reference_date": "2026-10-25",
+        "programme_name": "Engineering & Technology",
+        "intake_approved": 480
+      }
+    ],
+    "total": 25,
+    "limit": 50,
+    "offset": 0
+  }
+  ```
+
+### `POST /api/applications`
+- **Description:** Register and submit a new institutional application.
+- **Headers:** `X-User-Role: Institution Admin` or `Intake Officer`
+- **Request Body:**
+  ```json
+  {
+    "institution_id": "INST001",
+    "application_type": "Extension of Approval",
+    "academic_year": "2026-2027",
+    "contact_email": "registrar@pit-pune.edu.in",
+    "contact_phone": "+91 20 2567 8901",
+    "programme_name": "Computer Engineering",
+    "intake_approved": 120
+  }
+  ```
+- **Response `201 Created`:** Complete `ApplicationResponse` with auto-generated ID `APP026+`.
+
+### `GET /api/applications/{id}`
+- **Description:** Retrieve full application dossier including historical transitions, active scrutiny, deficiencies, and formal decision.
+- **Response `200 OK`:** `ApplicationDetailResponse`
+
+### `POST /api/applications/{id}/transition`
+- **Description:** Trigger an allowed state progression in the workflow state machine.
+- **Request Body:**
+  ```json
+  {
+    "action": "ASSIGN_SCRUTINY",
+    "to_stage": "INITIAL_SCRUTINY",
+    "remarks": "Assigned to Scrutiny Panel 3"
+  }
+  ```
+- **Response `200 OK`:** Updated `ApplicationResponse`
+
+### `POST /api/applications/{id}/scrutiny`
+- **Description:** Record technical scrutiny evaluation. If deficient, creates deficiency items and sets `deficiency_flag='Yes'`.
+- **Headers:** `X-User-Role: Scrutiny Officer` or `Admin`
+- **Request Body:**
+  ```json
+  {
+    "scrutiny_type": "INITIAL",
+    "outcome": "DEFICIENT",
+    "remarks": "Land lease deed and fire safety certificate require attention.",
+    "deficiencies": [
+      "Submit registered lease deed valid for at least 30 years.",
+      "Upload valid Fire Safety Clearance NOC from competent municipal authority."
+    ]
+  }
+  ```
+- **Response `200 OK`:** Application record transitioned to `DEFICIENCY_RAISED`.
+
+### `POST /api/applications/{id}/deficiency/respond`
+- **Description:** Institution responds to open deficiency items, advancing case to `RE_SCRUTINY`.
+- **Headers:** `X-User-Role: Institution Admin`
+- **Request Body:**
+  ```json
+  {
+    "responses": [
+      {
+        "deficiency_id": 1,
+        "institution_response": "Uploaded 99-year registered lease agreement (doc_7712.pdf)."
+      },
+      {
+        "deficiency_id": 2,
+        "institution_response": "Attached renewed Fire Safety Certificate valid until 2028."
+      }
+    ],
+    "remarks": "All documents corrected and resubmitted."
+  }
+  ```
+- **Response `200 OK`:** Application record transitioned to `RE_SCRUTINY`.
+
+### `POST /api/applications/{id}/decision`
+- **Description:** Record the official statutory decision. **Restricted exclusively to Competent Authority.**
+- **Headers:** `X-User-Role: Competent Authority Secretariat` or `Admin`
+- **Request Body:**
+  ```json
+  {
+    "decision": "APPROVED",
+    "reasons": "All statutory norms under AICTE APH 2024-27 satisfied. Scrutiny and EVC clean.",
+    "conditions": "Subject to submission of annual biometric attendance compliance report."
+  }
+  ```
+- **Response `200 OK`:** Application record transitioned to `COMPLETED` with immutable decision audit entry.
+
+---
+
+## 4. Compliance, EVC, Document & Deadline Endpoints (Member 4)
 
 ### `GET /api/evcs`
-- **Purpose:** List EVC records with optional filtering.
-- **Query Parameters:**
-  - `application_id` (string, optional)
-  - `status` (EVCStatus, optional)
-  - `assigned_team_id` (string, optional)
-  - `skip` (int, default: 0)
-  - `limit` (int, default: 50)
-- **Response:** `200 OK` List of `EVCResponse`
+- **Description:** List EVC inspection records.
+- **Response `200 OK`:**
+  ```json
+  [
+    {
+      "id": "EVC001",
+      "application_id": "APP003",
+      "status": "SCHEDULED",
+      "assigned_team_id": "EVC_TEAM_SOUTH_01",
+      "assigned_members": ["Dr Meera Shah", "Prof. S. Iyer"],
+      "planned_visit_date": "2026-11-07T10:00:00Z",
+      "venue_address": "Chennai Technical University Campus",
+      "reschedule_history": [],
+      "created_at": "2026-10-15T09:00:00Z"
+    }
+  ]
+  ```
 
 ### `POST /api/evcs`
-- **Purpose:** Initialize an EVC verification record for an application.
+- **Description:** Schedule or initialize an EVC inspection for an application.
 - **Request Body:**
   ```json
   {
-    "application_id": "app-synthetic-101",
-    "assigned_team_id": "EVC_TEAM_WEST_04",
-    "assigned_members": ["Prof. R. K. Sharma", "Dr. Anita Desai"],
-    "venue_address": "Navi Mumbai Campus",
-    "scheduling_notes": "Pending schedule confirmation"
+    "application_id": "APP003",
+    "assigned_team_id": "EVC_TEAM_SOUTH_01",
+    "assigned_members": ["Dr Meera Shah", "Prof. S. Iyer"],
+    "venue_address": "Chennai Technical University Campus",
+    "scheduling_notes": "Physical lab and library inspection"
   }
   ```
-- **Response:** `201 Created` (`EVCResponse`)
+- **Response `201 Created`:** `EVCResponse`
 
-### `GET /api/evcs/{evc_id}`
-- **Purpose:** Get detailed EVC record, including reschedule history and report status.
-- **Response:** `200 OK` (`EVCResponse`)
+### `POST /api/evcs/{id}/schedule`
+- **Description:** Set planned inspection date and venue. Transitions status to `SCHEDULED`.
 
-### `POST /api/evcs/{evc_id}/schedule`
-- **Purpose:** Set planned visit date and venue. Transitions status from `PENDING_SCHEDULING` to `SCHEDULED`.
+### `POST /api/evcs/{id}/reschedule`
+- **Description:** Reschedule visit date with mandatory justification. Retains prior date in `reschedule_history`.
 - **Request Body:**
   ```json
   {
-    "planned_visit_date": "2026-10-30T10:00:00Z",
-    "venue_address": "Campus Road 1",
-    "notes": "Official inspection date set"
+    "new_planned_visit_date": "2026-11-12T10:00:00Z",
+    "reason": "Expert committee travel delay due to adverse weather",
+    "notes": "Coordinated with institution principal"
   }
   ```
-- **Response:** `200 OK` (`EVCResponse`)
 
-### `POST /api/evcs/{evc_id}/reschedule`
-- **Purpose:** Reschedule an existing visit. Appends prior schedule to `reschedule_history` without deleting old date.
+### `POST /api/evcs/{id}/complete-visit`
+- **Description:** Record visit conclusion. Transitions status to `VISIT_COMPLETED`.
+
+### `POST /api/evcs/{id}/submit-report`
+- **Description:** EVC committee submits factual findings and recommendation.
 - **Request Body:**
   ```json
   {
-    "new_planned_visit_date": "2026-11-02T10:00:00Z",
-    "reason": "Expert committee travel interruption",
-    "notes": "Confirmed with institution"
-  }
-  ```
-- **Response:** `200 OK` (`EVCResponse`)
-
-### `POST /api/evcs/{evc_id}/complete-visit`
-- **Purpose:** Record visit conclusion. Transitions status to `VISIT_COMPLETED`.
-- **Request Body:**
-  ```json
-  {
-    "actual_visit_date": "2026-11-02T15:30:00Z",
-    "visit_notes": "All laboratories and fire exits physically inspected."
-  }
-  ```
-- **Response:** `200 OK` (`EVCResponse`)
-
-### `POST /api/evcs/{evc_id}/submit-report`
-- **Purpose:** EVC team submits factual observations and recommendations. Status -> `REPORT_SUBMITTED`.
-- **Request Body:**
-  ```json
-  {
-    "findings_summary": "Laboratory equipment and faculty cadres comply with norms.",
+    "findings_summary": "All 12 computer laboratories, server rooms, and fire escapes physically inspected.",
     "recommendation": "RECOMMENDED",
-    "report_document_id": "doc-evc-report-001"
+    "report_document_id": "DOC-2026-0008"
   }
   ```
-- **Response:** `200 OK` (`EVCResponse`)
-
-### `POST /api/evcs/{evc_id}/review-report`
-- **Purpose:** Authorized officer reviews report. Status -> `REPORT_REVIEWED`.
-- **Headers:** `X-User-Role: COMPLIANCE_OFFICER` (or `ADMIN`, `SCRUTINY_OFFICER`)
-- **Request Body:**
-  ```json
-  {
-    "outcome": "ACCEPTED",
-    "review_notes": "Findings accepted and forwarded to committee case file."
-  }
-  ```
-- **Response:** `200 OK` (`EVCResponse`)
-
----
-
-## 3. Compliance Obligations & Undertakings Endpoints
 
 ### `GET /api/undertakings`
-- **Query Parameters:** `institution_id`, `application_id`, `status`, `skip`, `limit`
-- **Response:** `200 OK` List of `ObligationResponse`
+- **Description:** List compliance obligations and statutory undertakings.
+- **Response `200 OK`:** List of `ObligationResponse`
 
 ### `POST /api/undertakings`
-- **Purpose:** Register a new regulatory undertaking or condition.
-- **Request Body:**
-  ```json
-  {
-    "institution_id": "INST-MUMBAI-01",
-    "application_id": "app-synthetic-101",
-    "title": "Faculty Cadre Ratio Compliance Undertaking",
-    "obligation_type": "FACULTY_CADRE_RATIO",
-    "description": "Maintain 1:15 cadre ratio.",
-    "source_reference": "APH 2024-2027 Section 4.3",
-    "is_illustrative_demo_rule": false,
-    "due_date": "2026-11-15T00:00:00Z",
-    "responsible_owner": "Principal"
-  }
-  ```
-- **Response:** `201 Created` (`ObligationResponse`)
+- **Description:** Register a new compliance obligation.
 
-### `POST /api/undertakings/{obligation_id}/submit`
-- **Purpose:** Institution submits evidence document. Status -> `SUBMITTED`.
-- **Request Body:**
-  ```json
-  {
-    "evidence_document_id": "doc-faculty-affidavit-001",
-    "submission_notes": "Notarized affidavit and board resolution attached."
-  }
-  ```
-- **Response:** `200 OK` (`ObligationResponse`)
+### `POST /api/undertakings/{id}/submit`
+- **Description:** Institution uploads undertaking evidence document.
 
-### `POST /api/undertakings/{obligation_id}/request-correction`
-- **Purpose:** Officer returns evidence for correction. Status -> `NEEDS_CORRECTION`. Appends to `correction_history`.
-- **Headers:** `X-User-Role: COMPLIANCE_OFFICER`
-- **Request Body:**
-  ```json
-  {
-    "reason": "Missing Professor cadre appointment letters.",
-    "guidance": "Please upload Annexure 3."
-  }
-  ```
-- **Response:** `200 OK` (`ObligationResponse`)
-
-### `POST /api/undertakings/{obligation_id}/verify`
-- **Purpose:** Official verification by compliance officer. Status -> `VERIFIED`.
-- **Headers:** `X-User-Role: COMPLIANCE_OFFICER`
-- **Request Body:**
-  ```json
-  {
-    "verification_notes": "Documents verified against sanctioned intake requirements."
-  }
-  ```
-- **Response:** `200 OK` (`ObligationResponse`)
-
----
-
-## 4. Document Metadata, Versioning & Renewal Endpoints
+### `POST /api/undertakings/{id}/verify`
+- **Description:** Compliance Officer verifies submitted evidence.
+- **Headers:** `X-User-Role: Compliance Officer`
 
 ### `GET /api/documents`
-- **Query Parameters:** `institution_id`, `application_id`, `obligation_id`, `document_type`, `is_latest`, `review_status`, `skip`, `limit`
-- **Response:** `200 OK` List of `DocumentResponse`
+- **Description:** List institutional regulatory documents with version history and expiry tracking.
 
-### `POST /api/documents`
-- **Purpose:** Register document metadata (Version 1).
-- **Request Body:**
-  ```json
-  {
-    "institution_id": "INST-MUMBAI-01",
-    "document_type": "FIRE_SAFETY_NOC",
-    "title": "Municipal Fire NOC 2025",
-    "file_name": "fire_noc.pdf",
-    "storage_path": "/vault/docs/INST-MUMBAI-01/fire_noc.pdf",
-    "file_size_bytes": 1048576,
-    "expiry_date": "2026-11-10T00:00:00Z",
-    "is_expiry_tracked": true
-  }
-  ```
-- **Response:** `201 Created` (`DocumentResponse`, `version: 1`, `is_latest: true`)
-
-### `POST /api/documents/{document_id}/renew`
-- **Purpose:** Register replacement/renewal document (Version N+1). Retains prior version intact with `is_latest: false`.
-- **Request Body:**
-  ```json
-  {
-    "title": "Municipal Fire NOC (Renewed 2026-2027)",
-    "file_name": "fire_noc_2026.pdf",
-    "expiry_date": "2027-11-10T00:00:00Z",
-    "renewal_reason": "Annual statutory municipal renewal"
-  }
-  ```
-- **Response:** `201 Created` (`DocumentResponse`, `version: 2`, `previous_version_id: "<v1_id>"`, `is_latest: true`)
-
-### `GET /api/documents/status/expiring-soon`
-- **Query Parameters:** `reference_time` (datetime, optional), `threshold_days` (int, default: 30)
-- **Response:** `200 OK` List of active documents expiring within threshold.
-
-### `GET /api/documents/status/expired`
-- **Query Parameters:** `reference_time` (datetime, optional)
-- **Response:** `200 OK` List of active documents past their expiry date.
-
-### `POST /api/documents/{document_id}/review`
-- **Purpose:** Officer verifies or rejects document.
-- **Headers:** `X-User-Role: COMPLIANCE_OFFICER`
-- **Request Body:**
-  ```json
-  {
-    "status": "VERIFIED",
-    "review_notes": "Verified against municipal corporation register."
-  }
-  ```
-- **Response:** `200 OK` (`DocumentResponse`)
-
----
-
-## 5. Deadlines & Escalation Monitoring Endpoints
+### `POST /api/documents/{id}/renew`
+- **Description:** Submit renewed document. Creates version $N+1$, marks version $N$ as superseded (`is_latest: false`), and retains version lineage.
 
 ### `GET /api/deadlines`
-- **Query Parameters:** `entity_type`, `entity_id`, `owner_role`, `status`, `skip`, `limit`
-- **Response:** `200 OK` List of `DeadlineResponse`
+- **Description:** List active deadlines, SLA benchmarks, and escalation states.
 
-### `POST /api/deadlines`
-- **Purpose:** Register tracked statutory or operational deadline.
-- **Request Body:**
-  ```json
-  {
-    "entity_type": "APPLICATION",
-    "entity_id": "app-synthetic-101",
-    "deadline_type": "DEFICIENCY_RESPONSE",
-    "title": "Deficiency Clarification Window",
-    "due_date": "2026-11-05T18:00:00Z",
-    "owner_role": "APPLICANT",
-    "warning_threshold_hours": 48,
-    "escalation_policy": "NOTIFY_REGIONAL_OFFICER_ON_OVERDUE",
-    "is_statutory": true
-  }
-  ```
-- **Response:** `201 Created` (`DeadlineResponse`)
-
-### `POST /api/deadlines/evaluate`
-- **Purpose:** Deterministically evaluates active deadlines against `reference_time` (or system UTC). Triggers deduplicated upcoming reminders and overdue escalations.
-- **Request Body:**
-  ```json
-  {
-    "reference_time": "2026-11-06T00:00:00Z"
-  }
-  ```
-- **Response:** `200 OK`
-  ```json
-  {
-    "evaluated_at": "2026-10-25T14:15:00Z",
-    "reference_time": "2026-11-06T00:00:00Z",
-    "total_active_evaluated": 5,
-    "upcoming_warnings_issued": 1,
-    "overdue_escalations_issued": 2,
-    "deadlines_marked_overdue": 2
-  }
-  ```
-
-### `POST /api/deadlines/{deadline_id}/complete`
-- **Purpose:** Marks deadline completed once underlying obligation/task is done. Prevents future alerts.
-- **Response:** `200 OK` (`DeadlineResponse`)
-
-### `POST /api/deadlines/{deadline_id}/cancel`
-- **Purpose:** Cancels obsolete or superseded deadline.
-- **Response:** `200 OK` (`DeadlineResponse`)
-
----
-
-## 6. In-App Notifications Endpoints
+### `POST /api/deadlines/check`
+- **Description:** Deterministic deadline evaluation against an optional `reference_time`.
+- **Query Parameters:** `reference_time` (ISO 8601 string, optional)
 
 ### `GET /api/notifications`
-- **Query Parameters:** `recipient_role`, `recipient_id`, `is_read`, `entity_type`, `entity_id`, `skip`, `limit`
-- **Response:** `200 OK` List of `NotificationResponse`
+- **Description:** List in-app notifications for the active user/role. Supports deduplication.
 
-### `POST /api/notifications/{notification_id}/read`
-- **Purpose:** Marks notification as read.
-- **Response:** `200 OK` (`NotificationResponse`, `is_read: true`, `read_at: timestamp`)
+### `PATCH /api/notifications/{id}/read`
+- **Description:** Mark notification as read.
+
+### `GET /api/audit-logs`
+- **Description:** Retrieve system-wide immutable audit trail.
+- **Query Parameters:** `entity_type`, `entity_id`, `actor_id`, `skip`, `limit`
 
 ---
 
-## 7. Dashboard & Audit Endpoints
+## 5. Unified Dashboard Endpoint
 
-### `GET /api/dashboard/compliance-summary`
-- **Purpose:** Aggregated live metrics for EVC, compliance, document renewals, deadlines, notifications, and audit volume.
-- **Query Parameters:** `reference_time` (datetime, optional)
-- **Response:** `200 OK`
+### `GET /api/dashboard/summary`
+- **Description:** Aggregates overall application pipeline statistics with compliance, EVC, and document metrics.
+- **Response `200 OK`:**
   ```json
   {
-    "computed_at": "2026-10-25T14:15:00Z",
-    "evc": {
-      "pending_scheduling": 1,
-      "scheduled": 1,
-      "completed_pending_report": 0,
-      "reports_pending_review": 1
+    "totalApplications": 25,
+    "pendingScrutiny": 7,
+    "deficiencyCases": 5,
+    "evcsScheduled": 3,
+    "expiringDocuments": 4,
+    "upcomingDeadlines": 6,
+    "stageDistribution": [
+      {"stage": "Submitted", "count": 4},
+      {"stage": "Scrutiny", "count": 7},
+      {"stage": "Re-scrutiny", "count": 3},
+      {"stage": "EVC", "count": 3},
+      {"stage": "Executive Decision", "count": 5},
+      {"stage": "Appeal/Post-approval", "count": 3}
+    ],
+    "ageingBuckets": [
+      {"bucket": "0–15 days", "count": 8},
+      {"bucket": "16–30 days", "count": 10},
+      {"bucket": "31–45 days", "count": 4},
+      {"bucket": "46–60 days", "count": 2},
+      {"bucket": "60+ days", "count": 1}
+    ],
+    "compliance_summary": {
+      "evcs_pending_scheduling": 1,
+      "evcs_scheduled": 3,
+      "evcs_completed_pending_report": 1,
+      "evcs_reports_pending_review": 1,
+      "open_obligations": 6,
+      "documents_expiring_soon": 2,
+      "documents_expired": 2,
+      "deadlines_overdue": 3
     },
-    "compliance": {
-      "open_obligations": 2,
-      "awaiting_verification": 1,
-      "overdue_obligations": 1
+    "by_stage": {
+      "SUBMITTED": 4,
+      "INITIAL_SCRUTINY": 7,
+      "DEFICIENCY_RAISED": 3,
+      "RE_SCRUTINY": 2,
+      "EVC_SCHEDULED": 2,
+      "EVC_COMPLETED": 1,
+      "COMMITTEE_REVIEW": 2,
+      "DECISION_PENDING": 2,
+      "COMPLETED": 2
     },
-    "documents": {
-      "nearing_expiry_30_days": 1,
-      "past_expiry": 1
-    },
-    "deadlines": {
-      "upcoming_active": 1,
-      "overdue": 1,
-      "escalations_generated": 1
-    },
-    "notifications": {
-      "unread_count": 2
-    },
-    "audit": {
-      "total_events_logged": 15
+    "by_status": {
+      "IN_PROGRESS": 18,
+      "ACTION_REQUIRED": 5,
+      "COMPLETED": 2
     }
   }
   ```
-
-### `GET /api/audit-logs`
-- **Purpose:** Read-only immutable audit trail.
-- **Query Parameters:** `entity_type`, `entity_id`, `actor_id`, `action`, `skip`, `limit`
-- **Response:** `200 OK` List of `AuditLogResponse`

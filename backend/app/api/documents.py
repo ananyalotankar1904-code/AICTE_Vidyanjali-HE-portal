@@ -3,15 +3,15 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.enums import DocumentReviewStatus, UserRole
-from app.schemas.document import (
+from backend.app.db import get_db
+from backend.app.enums import DocumentReviewStatus, UserRole
+from backend.app.schemas.document import (
     DocumentRegisterRequest,
     DocumentRenewRequest,
     DocumentReviewRequest,
     DocumentResponse,
 )
-from app.services.document import (
+from backend.app.services.document import (
     register_document,
     get_document_by_id,
     list_documents,

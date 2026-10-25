@@ -2,9 +2,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.enums import EVCStatus, UserRole
-from app.schemas.evc import (
+from backend.app.db import get_db
+from backend.app.enums import EVCStatus, UserRole
+from backend.app.schemas.evc import (
     EVCCreateRequest,
     EVCScheduleRequest,
     EVCRescheduleRequest,
@@ -14,7 +14,7 @@ from app.schemas.evc import (
     EVCUpdateRequest,
     EVCResponse,
 )
-from app.services.evc import (
+from backend.app.services.evc import (
     create_evc_record,
     get_evc_by_id,
     list_evcs,

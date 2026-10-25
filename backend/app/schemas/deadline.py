@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict
-from app.enums import DeadlineStatus
+from backend.app.enums import DeadlineStatus
 
 
 class DeadlineCreateRequest(BaseModel):

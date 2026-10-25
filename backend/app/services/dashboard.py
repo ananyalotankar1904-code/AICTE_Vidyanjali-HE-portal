@@ -2,14 +2,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
-from app.models.evc import EVCRecord
-from app.models.compliance import ComplianceObligation
-from app.models.document import Document
-from app.models.deadline import DeadlineRecord
-from app.models.notification import Notification
-from app.models.audit import AuditEvent
-from app.enums import EVCStatus, ObligationStatus, DeadlineStatus
-from app.utils.datetime_utils import utc_now, ensure_naive_utc
+from backend.app.models.evc import EVCRecord
+from backend.app.models.compliance import ComplianceObligation
+from backend.app.models.document import Document
+from backend.app.models.deadline import DeadlineRecord
+from backend.app.models.notification import Notification
+from backend.app.models.audit import AuditEvent
+from backend.app.enums import EVCStatus, ObligationStatus, DeadlineStatus
+from backend.app.utils.datetime_utils import utc_now, ensure_naive_utc
 
 
 def get_compliance_dashboard_metrics(

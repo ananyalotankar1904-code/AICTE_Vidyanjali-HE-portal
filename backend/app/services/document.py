@@ -4,12 +4,12 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.document import Document
-from app.models.application import Application
-from app.models.compliance import ComplianceObligation
-from app.enums import DocumentReviewStatus, EntityType, UserRole
-from app.services.audit import record_audit_event
-from app.utils.datetime_utils import utc_now, ensure_naive_utc
+from backend.app.models.document import Document
+from backend.app.models.application import Application
+from backend.app.models.compliance import ComplianceObligation
+from backend.app.enums import DocumentReviewStatus, EntityType, UserRole
+from backend.app.services.audit import record_audit_event
+from backend.app.utils.datetime_utils import utc_now, ensure_naive_utc
 
 
 def get_document_by_id(db: Session, document_id: str) -> Document:

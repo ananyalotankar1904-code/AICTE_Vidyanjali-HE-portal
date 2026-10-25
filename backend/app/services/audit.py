@@ -1,6 +1,6 @@
 from typing import Any, Optional, Dict
 from sqlalchemy.orm import Session
-from app.models.audit import AuditEvent
+from backend.app.models.audit import AuditEvent
 
 
 def record_audit_event(

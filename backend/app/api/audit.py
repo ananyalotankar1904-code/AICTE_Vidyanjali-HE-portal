@@ -4,8 +4,8 @@ from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models.audit import AuditEvent
+from backend.app.db import get_db
+from backend.app.models.audit import AuditEvent
 
 
 class AuditLogResponse(BaseModel):

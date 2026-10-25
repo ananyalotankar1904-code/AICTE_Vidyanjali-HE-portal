@@ -1,10 +1,10 @@
-from app.models.application import Application
-from app.models.audit import AuditEvent
-from app.models.evc import EVCRecord
-from app.models.compliance import ComplianceObligation
-from app.models.document import Document
-from app.models.deadline import DeadlineRecord
-from app.models.notification import Notification
+from .application import Application
+from .audit import AuditEvent
+from .evc import EVCRecord
+from .compliance import ComplianceObligation
+from .document import Document
+from .deadline import DeadlineRecord
+from .notification import Notification
 
 __all__ = [
     "Application",

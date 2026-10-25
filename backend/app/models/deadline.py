@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, Boolean, JSON
-from app.db import Base
-from app.enums import DeadlineStatus
+from backend.app.db import Base
+from backend.app.enums import DeadlineStatus
 
 
 def utc_now():

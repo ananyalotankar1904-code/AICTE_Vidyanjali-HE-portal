@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from app.enums import ObligationStatus, UserRole
+from backend.app.enums import ObligationStatus, UserRole
 
 
 def test_obligation_full_lifecycle(client):

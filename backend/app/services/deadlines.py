@@ -3,12 +3,12 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.deadline import DeadlineRecord
-from app.schemas.deadline import DeadlineEvaluationSummary
-from app.enums import DeadlineStatus, NotificationType, EntityType, UserRole
-from app.services.audit import record_audit_event
-from app.services.notifications import create_notification
-from app.utils.datetime_utils import utc_now, ensure_naive_utc
+from backend.app.models.deadline import DeadlineRecord
+from backend.app.schemas.deadline import DeadlineEvaluationSummary
+from backend.app.enums import DeadlineStatus, NotificationType, EntityType, UserRole
+from backend.app.services.audit import record_audit_event
+from backend.app.services.notifications import create_notification
+from backend.app.utils.datetime_utils import utc_now, ensure_naive_utc
 
 
 def get_deadline_by_id(db: Session, deadline_id: str) -> DeadlineRecord:

@@ -4,10 +4,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-from app.db import Base, get_db
-from app.main import app
-from app.models.application import Application
-from app.enums import ApplicationStatus, WorkflowStage
+from backend.app.db import Base, get_db
+from backend.app.main import app
+from backend.app.models.application import Application
+from backend.app.enums import ApplicationStatus, WorkflowStage
 
 # In-memory SQLite database isolated for each test run
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

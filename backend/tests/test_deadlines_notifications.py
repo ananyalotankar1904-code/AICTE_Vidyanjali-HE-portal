@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from app.enums import DeadlineStatus, UserRole, NotificationType
+from backend.app.enums import DeadlineStatus, UserRole, NotificationType
 
 
 def test_deadline_deterministic_evaluation_and_deduplication(client):

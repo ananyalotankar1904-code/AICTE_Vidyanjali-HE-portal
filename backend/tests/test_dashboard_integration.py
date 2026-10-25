@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from app.enums import UserRole
+from backend.app.enums import UserRole
 
 
 def test_dashboard_compliance_metrics(client):

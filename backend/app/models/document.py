@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
-from app.db import Base
-from app.enums import DocumentReviewStatus
+from backend.app.db import Base
+from backend.app.enums import DocumentReviewStatus
 
 
 def utc_now():

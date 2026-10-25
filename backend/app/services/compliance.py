@@ -3,11 +3,11 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.compliance import ComplianceObligation
-from app.models.application import Application
-from app.enums import ObligationStatus, EntityType, NotificationType, UserRole
-from app.services.audit import record_audit_event
-from app.services.notifications import create_notification
+from backend.app.models.compliance import ComplianceObligation
+from backend.app.models.application import Application
+from backend.app.enums import ObligationStatus, EntityType, NotificationType, UserRole
+from backend.app.services.audit import record_audit_event
+from backend.app.services.notifications import create_notification
 
 
 def utc_now() -> datetime:

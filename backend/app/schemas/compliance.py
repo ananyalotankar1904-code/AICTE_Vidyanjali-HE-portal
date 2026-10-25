@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict
-from app.enums import ObligationStatus
+from backend.app.enums import ObligationStatus
 
 
 class ObligationCreateRequest(BaseModel):

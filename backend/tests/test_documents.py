@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from app.enums import DocumentReviewStatus
+from backend.app.enums import DocumentReviewStatus
 
 
 def test_document_registration_and_renewal_versioning(client):

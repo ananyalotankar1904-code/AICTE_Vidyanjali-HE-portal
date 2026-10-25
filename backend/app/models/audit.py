@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, Text, JSON
-from app.db import Base
+from backend.app.db import Base
 
 
 def utc_now():

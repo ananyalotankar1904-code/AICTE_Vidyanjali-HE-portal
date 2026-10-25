@@ -3,11 +3,12 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models.application import Application
-from app.services.dashboard import get_compliance_dashboard_metrics
-from app.utils.datetime_utils import utc_now
+from backend.app.db import get_db
+from backend.app.models.application import Application
+from backend.app.services.dashboard import get_compliance_dashboard_metrics
+from backend.app.utils.datetime_utils import utc_now
 
+# Standalone router for Member 4 backend app (includes compliance-summary + standalone summary)
 router = APIRouter(prefix="/dashboard", tags=["Dashboard & Metrics"])
 
 
@@ -21,6 +22,17 @@ def get_compliance_summary(
     deadlines, notifications, and audit volume.
     """
     return get_compliance_dashboard_metrics(db=db, reference_time=reference_time)
+
+
+# Router dedicated to compliance-specific metrics (mounted in unified gateway without duplicate /summary)
+compliance_dashboard_router = APIRouter(prefix="/dashboard", tags=["Compliance Metrics"])
+compliance_dashboard_router.add_api_route(
+    "/compliance-summary",
+    get_compliance_summary,
+    methods=["GET"],
+    response_model=Dict[str, Any],
+    summary="Get compliance summary metrics",
+)
 
 
 @router.get("/summary", response_model=Dict[str, Any])

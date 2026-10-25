@@ -2,9 +2,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.schemas.notification import NotificationResponse
-from app.services.notifications import list_notifications, mark_notification_as_read
+from backend.app.db import get_db
+from backend.app.schemas.notification import NotificationResponse
+from backend.app.services.notifications import list_notifications, mark_notification_as_read
 
 router = APIRouter(prefix="/notifications", tags=["In-App Notifications"])
 

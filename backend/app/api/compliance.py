@@ -2,16 +2,16 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.enums import ObligationStatus, UserRole
-from app.schemas.compliance import (
+from backend.app.db import get_db
+from backend.app.enums import ObligationStatus, UserRole
+from backend.app.schemas.compliance import (
     ObligationCreateRequest,
     ObligationSubmitEvidenceRequest,
     ObligationVerifyRequest,
     ObligationCorrectionRequest,
     ObligationResponse,
 )
-from app.services.compliance import (
+from backend.app.services.compliance import (
     create_compliance_obligation,
     get_obligation_by_id,
     list_obligations,

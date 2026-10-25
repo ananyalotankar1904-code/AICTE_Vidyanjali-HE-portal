@@ -3,8 +3,8 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.notification import Notification
-from app.enums import NotificationType
+from backend.app.models.notification import Notification
+from backend.app.enums import NotificationType
 
 
 def utc_now() -> datetime:

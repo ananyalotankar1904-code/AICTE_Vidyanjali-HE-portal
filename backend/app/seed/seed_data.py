@@ -1,14 +1,14 @@
 """Repeatable synthetic demo seed data generator for compliance modules."""
 from datetime import datetime, timezone, timedelta
-from app.db import SessionLocal, init_db
-from app.models.application import Application
-from app.models.evc import EVCRecord
-from app.models.compliance import ComplianceObligation
-from app.models.document import Document
-from app.models.deadline import DeadlineRecord
-from app.models.notification import Notification
-from app.models.audit import AuditEvent
-from app.enums import (
+from backend.app.db import SessionLocal, init_db
+from backend.app.models.application import Application
+from backend.app.models.evc import EVCRecord
+from backend.app.models.compliance import ComplianceObligation
+from backend.app.models.document import Document
+from backend.app.models.deadline import DeadlineRecord
+from backend.app.models.notification import Notification
+from backend.app.models.audit import AuditEvent
+from backend.app.enums import (
     ApplicationStatus,
     WorkflowStage,
     EVCStatus,

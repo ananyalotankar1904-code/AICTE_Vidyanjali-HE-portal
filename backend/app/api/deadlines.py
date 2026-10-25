@@ -2,15 +2,15 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.enums import DeadlineStatus, UserRole
-from app.schemas.deadline import (
+from backend.app.db import get_db
+from backend.app.enums import DeadlineStatus, UserRole
+from backend.app.schemas.deadline import (
     DeadlineCreateRequest,
     DeadlineEvaluateRequest,
     DeadlineEvaluationSummary,
     DeadlineResponse,
 )
-from app.services.deadlines import (
+from backend.app.services.deadlines import (
     create_deadline_record,
     get_deadline_by_id,
     list_deadlines,

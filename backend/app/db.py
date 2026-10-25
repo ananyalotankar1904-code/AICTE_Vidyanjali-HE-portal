@@ -26,12 +26,12 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """Creates all database tables defined on Base metadata."""
     # Import all models to ensure they are registered with Base metadata
-    from app.models.application import Application
-    from app.models.audit import AuditEvent
-    from app.models.evc import EVCRecord
-    from app.models.compliance import ComplianceObligation
-    from app.models.document import Document
-    from app.models.deadline import DeadlineRecord
-    from app.models.notification import Notification
+    from backend.app.models.application import Application
+    from backend.app.models.audit import AuditEvent
+    from backend.app.models.evc import EVCRecord
+    from backend.app.models.compliance import ComplianceObligation
+    from backend.app.models.document import Document
+    from backend.app.models.deadline import DeadlineRecord
+    from backend.app.models.notification import Notification
 
     Base.metadata.create_all(bind=engine)

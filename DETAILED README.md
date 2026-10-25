@@ -1272,23 +1272,23 @@ might be a migration command or a seed script, but **the team must
 implement and document the real command**. Do not assume a command
 exists until it has been added.
 
-Start the API using the actual application entry point, for example:
+Start the API using the actual application entry point (configured on port 8005 to avoid collisions):
 
 ``` bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8005
 ```
-
-If the configured entry point differs, update this command in the
-README.
+or:
+``` bash
+python -m app.main
+```
 
 Open the FastAPI documentation in a browser at:
 
 ``` text
-http://127.0.0.1:8000/docs
+http://127.0.0.1:8005/docs
 ```
 
-This URL is only valid if the backend is configured to use that host and
-port.
+Port is configurable via the `PORT` variable in `backend/.env`.
 
 ### Frontend setup
 

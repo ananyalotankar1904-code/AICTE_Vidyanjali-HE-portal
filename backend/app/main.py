@@ -1,3 +1,5 @@
+import os
+import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +29,7 @@ app = FastAPI(
 # CORS configuration for frontend development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permits localhost:5173 (Vite) and any dev client
+    allow_origins=["*"],  # Permits localhost dev frontend clients
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,3 +55,10 @@ def root():
         "documentation": "/docs",
         "health": "/health"
     }
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8005))
+    host = os.getenv("HOST", "127.0.0.1")
+    print(f"Starting server on http://{host}:{port} (docs: http://{host}:{port}/docs)...")
+    uvicorn.run("app.main:app", host=host, port=port, reload=True)

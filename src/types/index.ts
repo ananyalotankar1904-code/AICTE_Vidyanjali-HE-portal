@@ -139,6 +139,12 @@ export interface DashboardSummary {
   upcomingDeadlines: number;
   stageDistribution: { stage: WorkflowStage; count: number }[];
   ageingBuckets: { bucket: string; count: number }[];
+  status?: string;
+  degraded?: boolean;
+  subsystem_status?: {
+    workflow_engine: string;
+    compliance_engine: string;
+  };
 }
 
 export type FilterView = 'All applications' | 'My queue' | 'At risk' | 'EVC pipeline';

@@ -1,23 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Download,
   Search,
   ChevronRight,
   ShieldCheck,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { Skeleton } from '../components/common/Skeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { toast } from '../components/common/Toast';
-import { useStore } from '../hooks/useStore';
+import { apiClient } from '../api/client';
+import { AuditEvent } from '../types';
 
 export const AuditHistoryPage: React.FC = () => {
   const navigate = useNavigate();
-  const { auditLogs } = useStore();
+
+  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('All');
+
+  const loadAuditLogs = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const logs = await apiClient.getAuditLogs();
+      setAuditLogs(logs);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to retrieve audit trail from unified gateway');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, []);
 
   const filteredLogs = auditLogs.filter((log) => {
     if (actionFilter !== 'All' && log.action !== actionFilter) return false;
@@ -75,6 +99,13 @@ export const AuditHistoryPage: React.FC = () => {
         </div>
 
         <div className="head-actions">
+          <Button
+            variant="secondary"
+            onClick={loadAuditLogs}
+            icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
+          >
+            Refresh
+          </Button>
           <Button
             variant="secondary"
             onClick={handleExportCsv}
@@ -149,7 +180,22 @@ export const AuditHistoryPage: React.FC = () => {
           }
         />
 
-        {filteredLogs.length === 0 ? (
+        {isLoading ? (
+          <Skeleton lines={5} />
+        ) : error ? (
+          <EmptyState
+            title="Audit trail could not be retrieved"
+            description={error}
+            actionText="Retry Connection"
+            onAction={loadAuditLogs}
+            icon={<AlertCircle size={44} color="#dc2626" />}
+          />
+        ) : auditLogs.length === 0 ? (
+          <EmptyState
+            title="No audit events recorded"
+            description="No operational or regulatory actions have been logged yet in the unified backend database."
+          />
+        ) : filteredLogs.length === 0 ? (
           <EmptyState
             title="No audit events matched"
             description="Try modifying search keywords or resetting the action filter."

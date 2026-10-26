@@ -16,7 +16,6 @@ import {
 import { Card, CardHeader } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { toast } from '../components/common/Toast';
-import { useStore } from '../hooks/useStore';
 import { ApplicationCategory } from '../types';
 
 // Zod validation schema
@@ -46,9 +45,10 @@ const intakeSchema = z.object({
 
 type IntakeFormData = z.infer<typeof intakeSchema>;
 
+import { apiClient } from '../api/client';
+
 export const ApplicationIntakePage: React.FC = () => {
   const navigate = useNavigate();
-  const { store } = useStore();
 
   const {
     register,
@@ -94,37 +94,40 @@ export const ApplicationIntakePage: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  const onSubmit = (data: IntakeFormData) => {
-    const assignedRoute = getAssignedRoute(data.type);
+  const onSubmit = async (data: IntakeFormData) => {
+    try {
+      const assignedRoute = getAssignedRoute(data.type);
+      const now = new Date();
+      // 21 days deadline from now
+      const targetDeadline = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0];
 
-    const now = new Date();
-    // 21 days deadline from now
-    const targetDeadline = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0];
+      const newApp = await apiClient.createApplication({
+        name: data.name,
+        city: data.city,
+        type: data.type,
+        owner: 'Scrutiny desk',
+        deadline: targetDeadline,
+        deficiency: '',
+        documents: ['Land ownership certificate', 'Faculty roster', 'Fire safety NOC'],
+        assignedRoute,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone,
+        applicantRole: 'Principal / Institutional Representative',
+        intakeCapacity: data.intakeCapacity,
+        programsOffered: ['Engineering & Technology Programs'],
+      });
 
-    const newApp = store.addApplication({
-      name: data.name,
-      city: data.city,
-      type: data.type,
-      owner: 'Scrutiny desk',
-      deadline: targetDeadline,
-      deficiency: '',
-      documents: ['Land ownership certificate', 'Faculty roster', 'Fire safety NOC'],
-      assignedRoute,
-      contactEmail: data.contactEmail,
-      contactPhone: data.contactPhone,
-      applicantRole: 'Principal / Institutional Representative',
-      intakeCapacity: data.intakeCapacity,
-      programsOffered: ['Engineering & Technology Programs'],
-    });
+      toast.show(
+        `Application registered successfully! Assigned ID: ${newApp.id}`,
+        'success'
+      );
 
-    toast.show(
-      `Application registered successfully! Assigned ID: ${newApp.id}`,
-      'success'
-    );
-
-    navigate(`/applications/${newApp.id}`);
+      navigate(`/applications/${newApp.id}`);
+    } catch (err: any) {
+      toast.show(err?.message || 'Failed to submit application to unified gateway', 'error');
+    }
   };
 
   return (

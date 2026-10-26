@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -7,19 +7,43 @@ import {
   CheckCircle2,
   ChevronRight,
   ShieldAlert,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { Skeleton } from '../components/common/Skeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { toast } from '../components/common/Toast';
 import { useStore } from '../hooks/useStore';
-import { NotificationKind } from '../types';
+import { apiClient } from '../api/client';
+import { NotificationKind, NotificationItem } from '../types';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { notifications, notificationPreferences, store } = useStore();
+  const { notificationPreferences, store } = useStore();
 
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>('All');
+
+  const loadNotifications = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const items = await apiClient.getNotifications();
+      setNotifications(items);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to retrieve notifications from unified gateway');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
   const filteredNotifications = notifications.filter((item) => {
     if (activeFilter === 'All') return true;
@@ -30,11 +54,15 @@ export const NotificationsPage: React.FC = () => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleMarkAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     store.markAllNotificationsRead();
     toast.show('All notifications marked as read.', 'info');
   };
 
   const handleToggleRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
+    );
     store.toggleNotificationRead(id);
   };
 
@@ -65,6 +93,13 @@ export const NotificationsPage: React.FC = () => {
         </div>
 
         <div className="head-actions">
+          <Button
+            variant="secondary"
+            onClick={loadNotifications}
+            icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
+          >
+            Refresh
+          </Button>
           <Button
             variant="secondary"
             onClick={handleMarkAllRead}
@@ -99,7 +134,23 @@ export const NotificationsPage: React.FC = () => {
             </div>
           </div>
 
-          {filteredNotifications.length === 0 ? (
+          {isLoading ? (
+            <Skeleton lines={4} />
+          ) : error ? (
+            <EmptyState
+              title="Notifications could not be retrieved"
+              description={error}
+              actionText="Retry Connection"
+              onAction={loadNotifications}
+              icon={<AlertCircle size={44} color="#dc2626" />}
+            />
+          ) : notifications.length === 0 ? (
+            <EmptyState
+              title="No notifications received"
+              description="There are currently no active alerts or reminders logged in the system."
+              icon={<CheckCircle2 size={42} color="#16a34a" />}
+            />
+          ) : filteredNotifications.length === 0 ? (
             <EmptyState
               title="All caught up!"
               description="No notifications match the chosen filter view."

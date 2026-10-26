@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -14,22 +14,28 @@ import {
   MapPin,
   CheckCircle2,
   XCircle,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Stepper } from '../components/common/Stepper';
 import { Modal } from '../components/common/Modal';
+import { Skeleton } from '../components/common/Skeleton';
 import { toast } from '../components/common/Toast';
-import { useStore } from '../hooks/useStore';
-import { WORKFLOW_STAGES } from '../types';
+import { apiClient } from '../api/client';
+import { WORKFLOW_STAGES, ApplicationRecord, ComplianceDocument, AuditEvent } from '../types';
 
 export const ApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { applications, documents, auditLogs, store } = useStore();
 
-  const app = applications.find((a) => a.id === id) || applications[0];
+  const [app, setApp] = useState<ApplicationRecord | null>(null);
+  const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Modal dialog states
   const [modalType, setModalType] = useState<
@@ -40,13 +46,122 @@ export const ApplicationDetailPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  if (!app) {
+  const loadApplication = async () => {
+    if (!id) return;
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const [appData, docsData, auditData] = await Promise.all([
+        apiClient.getApplicationById(id),
+        apiClient.getDocuments().catch(() => []),
+        apiClient.getAuditLogs().catch(() => []),
+      ]);
+
+      if (!appData) {
+        setFetchError(`Application ${id} does not exist in the approval registry.`);
+        setApp(null);
+      } else {
+        setApp(appData);
+        setDocuments(docsData);
+        setAuditLogs(auditData);
+      }
+    } catch (err: any) {
+      setFetchError(err?.message || `Failed to fetch application ${id} from server.`);
+      setApp(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadApplication();
+  }, [id]);
+
+  const handleOpenModal = (type: 'deficiency' | 'advance' | 'decision' | 'reminder') => {
+    setModalType(type);
+    setModalReason('');
+    setFormError('');
+  };
+
+  const handleCloseModal = () => {
+    setModalType(null);
+    setModalReason('');
+    setFormError('');
+    setIsSubmitting(false);
+  };
+
+  const handleSubmitModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (modalType !== 'reminder' && !modalReason.trim()) {
+      setFormError('Please enter a clear justification or reason before confirming.');
+      return;
+    }
+
+    if (!app) return;
+
+    setIsSubmitting(true);
+    setFormError('');
+
+    try {
+      let actionKey = 'ADVANCE_STAGE';
+      if (modalType === 'deficiency') actionKey = 'ISSUE_DEFICIENCY';
+      else if (modalType === 'decision') actionKey = 'RECORD_OFFICIAL_DECISION';
+      else if (modalType === 'reminder') actionKey = 'SEND_REMINDER';
+
+      const result = await apiClient.requestTransition(
+        app.id,
+        actionKey,
+        modalReason.trim(),
+        decisionOutcome,
+        app.status
+      );
+
+      toast.show(result.message, decisionOutcome === 'Approved' || modalType !== 'decision' ? 'success' : 'error');
+      handleCloseModal();
+      await loadApplication();
+    } catch (err: any) {
+      setFormError(err?.message || 'Server rejected transition request.');
+      toast.show(err?.message || 'Action rejected by server', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/applications')}
+          icon={<ArrowLeft size={15} />}
+          style={{ marginBottom: '16px' }}
+        >
+          Back to Applications
+        </Button>
+        <Card style={{ padding: '24px' }}>
+          <Skeleton lines={6} />
+        </Card>
+      </div>
+    );
+  }
+
+  if (fetchError || !app) {
     return (
       <div style={{ padding: '40px 0', textAlign: 'center' }}>
-        <h2>Application not found</h2>
-        <Button onClick={() => navigate('/applications')} style={{ marginTop: '16px' }}>
-          Return to applications list
-        </Button>
+        <AlertCircle size={44} color="#dc2626" style={{ margin: '0 auto 12px' }} />
+        <h2 style={{ color: '#C53030' }}>Application Not Found</h2>
+        <p style={{ color: 'var(--muted)', marginTop: '8px', maxWidth: '500px', margin: '8px auto 20px' }}>
+          {fetchError || `Application ${id} could not be found in the registry.`}
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <Button variant="secondary" onClick={loadApplication} icon={<RefreshCw size={14} />}>
+            Retry Request
+          </Button>
+          <Button onClick={() => navigate('/applications')}>
+            Return to Applications List
+          </Button>
+        </div>
       </div>
     );
   }
@@ -73,55 +188,6 @@ export const ApplicationDetailPage: React.FC = () => {
     if (app.stage === 2) return 'Scrutiny officer to verify resubmitted deficiency corrections';
     if (app.stage === 1) return 'Assigned scrutiny desk officer to verify statutory documentation';
     return 'Application awaiting initial desk assignment';
-  };
-
-  const handleOpenModal = (type: 'deficiency' | 'advance' | 'decision' | 'reminder') => {
-    setModalType(type);
-    setModalReason('');
-    setFormError('');
-  };
-
-  const handleCloseModal = () => {
-    setModalType(null);
-    setModalReason('');
-    setFormError('');
-    setIsSubmitting(false);
-  };
-
-  const handleSubmitModal = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (modalType !== 'reminder' && !modalReason.trim()) {
-      setFormError('Please enter a clear justification or reason before confirming.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      try {
-        if (modalType === 'deficiency') {
-          store.recordDeficiency(app.id, modalReason.trim());
-          toast.show('Deficiency request issued and assigned to the applicant institution.', 'error');
-        } else if (modalType === 'advance') {
-          store.advanceStage(app.id, modalReason.trim());
-          toast.show(`Application progressed to ${WORKFLOW_STAGES[Math.min(5, app.stage + 1)]}.`, 'success');
-        } else if (modalType === 'decision') {
-          store.recordOfficialDecision(app.id, decisionOutcome, modalReason.trim());
-          toast.show(
-            `Official decision recorded: ${decisionOutcome} by authorized human action.`,
-            decisionOutcome === 'Approved' ? 'success' : 'error'
-          );
-        } else if (modalType === 'reminder') {
-          store.sendReminder(app.id);
-          toast.show(`Deadline reminder dispatched to ${app.owner}.`, 'info');
-        }
-
-        handleCloseModal();
-      } catch (err: any) {
-        setFormError(err?.message || 'Action failed.');
-        setIsSubmitting(false);
-      }
-    }, 400);
   };
 
   const formatDate = (dateStr: string) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Clock,
@@ -6,18 +6,26 @@ import {
   CheckCircle2,
   FileCheck2,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
+import { Skeleton } from '../components/common/Skeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { toast } from '../components/common/Toast';
 import { useStore } from '../hooks/useStore';
-import { ComplianceDocument } from '../types';
+import { apiClient } from '../api/client';
+import { ComplianceDocument, ApplicationRecord } from '../types';
 
 export const CompliancePage: React.FC = () => {
-  const { documents, applications, store } = useStore();
+  const { store } = useStore();
+
+  const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [urgencyFilter, setUrgencyFilter] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<string>('All');
@@ -36,6 +44,27 @@ export const CompliancePage: React.FC = () => {
   const [inputNote, setInputNote] = useState('');
   const [formError, setFormError] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+
+  const loadComplianceData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [docList, appList] = await Promise.all([
+        apiClient.getDocuments(),
+        apiClient.getApplications().catch(() => []),
+      ]);
+      setDocuments(docList);
+      setApplications(appList);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to retrieve compliance documents from unified gateway');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadComplianceData();
+  }, []);
 
   // Filtering
   const filteredDocs = documents.filter((doc) => {
@@ -155,7 +184,14 @@ export const CompliancePage: React.FC = () => {
           </p>
         </div>
 
-        <div className="head-actions">
+        <div className="head-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            onClick={loadComplianceData}
+            icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
+          >
+            Refresh
+          </Button>
           <Button
             variant="primary"
             onClick={handleOpenUndertakingModal}
@@ -261,7 +297,22 @@ export const CompliancePage: React.FC = () => {
 
       {/* Data Table */}
       <Card padded={false}>
-        {filteredDocs.length === 0 ? (
+        {isLoading ? (
+          <Skeleton lines={5} />
+        ) : error ? (
+          <EmptyState
+            title="Compliance documents could not be retrieved"
+            description={error}
+            actionText="Retry Connection"
+            onAction={loadComplianceData}
+            icon={<AlertCircle size={44} color="#dc2626" />}
+          />
+        ) : documents.length === 0 ? (
+          <EmptyState
+            title="No compliance documents found"
+            description="There are currently no uploaded compliance documents or statutory certificates in the database."
+          />
+        ) : filteredDocs.length === 0 ? (
           <EmptyState
             title="No compliance records match filters"
             description="Adjust your urgency, category, or institution filter selection."

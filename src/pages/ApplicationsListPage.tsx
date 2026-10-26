@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -15,11 +15,16 @@ import { Skeleton } from '../components/common/Skeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { toast } from '../components/common/Toast';
 import { useStore } from '../hooks/useStore';
+import { apiClient } from '../api/client';
 import { WORKFLOW_STAGES, FilterView, ApplicationRecord } from '../types';
 
 export const ApplicationsListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { applications, store } = useStore();
+  const { store } = useStore();
+
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -29,9 +34,22 @@ export const ApplicationsListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  // Prototype loading and error simulation states
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const loadApplications = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await apiClient.getApplications();
+      setApplications(data);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch application records from unified gateway');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadApplications();
+  }, []);
 
   // Filter logic
   const filteredRows = useMemo(() => {
@@ -123,29 +141,6 @@ export const ApplicationsListPage: React.FC = () => {
     );
   };
 
-  const handleSimulateLoading = () => {
-    setIsLoading(true);
-    setHasError(false);
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.show('Applications refreshed successfully.', 'info');
-    }, 800);
-  };
-
-  const handleSimulateError = () => {
-    setHasError(true);
-    setIsLoading(false);
-  };
-
-  const handleRetry = () => {
-    setHasError(false);
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.show('Applications recovered.', 'success');
-    }, 700);
-  };
-
   const handleClearFilters = () => {
     setSearchQuery('');
     setStatusFilter('All');
@@ -183,17 +178,10 @@ export const ApplicationsListPage: React.FC = () => {
         <div className="head-actions">
           <Button
             variant="secondary"
-            onClick={handleSimulateLoading}
-            icon={<RefreshCw size={14} />}
+            onClick={loadApplications}
+            icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
           >
-            Show Loading
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleSimulateError}
-            icon={<AlertCircle size={14} />}
-          >
-            Simulate Error
+            Refresh
           </Button>
           <Button
             onClick={() => navigate('/applications/new')}
@@ -285,13 +273,20 @@ export const ApplicationsListPage: React.FC = () => {
       <Card padded={false}>
         {isLoading ? (
           <Skeleton lines={5} />
-        ) : hasError ? (
+        ) : error ? (
           <EmptyState
             title="Applications could not be loaded"
-            description="A temporary error occurred while retrieving application records in the prototype. Retry to restore data."
+            description={error}
             actionText="Retry Request"
-            onAction={handleRetry}
+            onAction={loadApplications}
             icon={<AlertCircle size={44} color="#dc2626" />}
+          />
+        ) : applications.length === 0 ? (
+          <EmptyState
+            title="No applications in database"
+            description="The unified backend database currently has no submitted application records."
+            actionText="Start New Intake"
+            onAction={() => navigate('/applications/new')}
           />
         ) : filteredRows.length === 0 ? (
           <EmptyState

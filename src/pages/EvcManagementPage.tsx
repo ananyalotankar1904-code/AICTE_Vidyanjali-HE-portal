@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
@@ -9,18 +9,28 @@ import {
   Clock,
   MoreVertical,
   FileCheck,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
+import { Skeleton } from '../components/common/Skeleton';
+import { EmptyState } from '../components/common/EmptyState';
 import { toast } from '../components/common/Toast';
 import { useStore } from '../hooks/useStore';
-import { EvcRecord } from '../types';
+import { apiClient } from '../api/client';
+import { EvcRecord, ApplicationRecord } from '../types';
 
 export const EvcManagementPage: React.FC = () => {
   const navigate = useNavigate();
-  const { evcs, applications, store } = useStore();
+  const { store } = useStore();
+
+  const [evcs, setEvcs] = useState<EvcRecord[]>([]);
+  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'List' | 'Calendar'>('List');
   const [selectedEvc, setSelectedEvc] = useState<EvcRecord | null>(null);
@@ -35,6 +45,27 @@ export const EvcManagementPage: React.FC = () => {
   const [inputNotes, setInputNotes] = useState('');
   const [formError, setFormError] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+
+  const loadEvcData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [evcList, appList] = await Promise.all([
+        apiClient.getEvcs(),
+        apiClient.getApplications().catch(() => []),
+      ]);
+      setEvcs(evcList);
+      setApplications(appList);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to retrieve EVC records from unified gateway');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEvcData();
+  }, []);
 
   const getAppName = (appId: string) => {
     return applications.find((a) => a.id === appId)?.name || appId;
@@ -123,7 +154,14 @@ export const EvcManagementPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="head-actions">
+        <div className="head-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Button
+            variant="secondary"
+            onClick={loadEvcData}
+            icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
+          >
+            Refresh
+          </Button>
           <div
             style={{
               display: 'inline-flex',
@@ -156,8 +194,24 @@ export const EvcManagementPage: React.FC = () => {
       {/* Main View Area */}
       {viewMode === 'List' ? (
         <Card padded={false}>
-          <div className="table-wrap">
-            <table className="data-table">
+          {isLoading ? (
+            <Skeleton lines={5} />
+          ) : error ? (
+            <EmptyState
+              title="EVC inspections could not be retrieved"
+              description={error}
+              actionText="Retry Connection"
+              onAction={loadEvcData}
+              icon={<AlertCircle size={44} color="#dc2626" />}
+            />
+          ) : evcs.length === 0 ? (
+            <EmptyState
+              title="No EVC inspections found"
+              description="There are currently no Expert Visit Committee inspection records scheduled in the database."
+            />
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
               <thead>
                 <tr>
                   <th>EVC Code</th>
@@ -233,6 +287,7 @@ export const EvcManagementPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          )}
         </Card>
       ) : (
         <Card>
@@ -240,6 +295,17 @@ export const EvcManagementPage: React.FC = () => {
             title="November 2026 Inspection Schedule"
             subtitle="Click any scheduled event to inspect committee assignments or modify dates"
           />
+          {isLoading ? (
+            <Skeleton lines={5} />
+          ) : error ? (
+            <EmptyState
+              title="Inspection schedule could not be retrieved"
+              description={error}
+              actionText="Retry Connection"
+              onAction={loadEvcData}
+              icon={<AlertCircle size={44} color="#dc2626" />}
+            />
+          ) : (
           <div
             style={{
               display: 'grid',
@@ -319,6 +385,7 @@ export const EvcManagementPage: React.FC = () => {
               );
             })}
           </div>
+          )}
         </Card>
       )}
 

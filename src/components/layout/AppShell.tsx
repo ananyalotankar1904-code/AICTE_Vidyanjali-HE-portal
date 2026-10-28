@@ -6,6 +6,30 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+interface SubMenuItem {
+  to: string;
+  label: string;
+}
+
+interface NavGroup {
+  id: string;
+  type: 'group';
+  label: string;
+  icon: string;
+  items: SubMenuItem[];
+}
+
+interface NavStandalone {
+  id: string;
+  type: 'standalone';
+  to: string;
+  label: string;
+  icon: string;
+  badge?: number;
+}
+
+type NavEntry = NavStandalone | NavGroup;
+
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const {
     role,
@@ -27,48 +51,129 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const isApplicant = role === ROLES[0];
   const isLangToggleSupported = role === ROLES[0] || role === 'Scrutiny Officer';
 
-  const applicantNav = [
-    { to: '/', label: language === 'hi' ? 'मेरा डैशबोर्ड' : 'My Dashboard', icon: '⌂' },
-    { to: '/applications', label: language === 'hi' ? 'मेरे आवेदन' : 'My Applications', icon: '▤' },
-    { to: '/schedule', label: language === 'hi' ? 'मेरी समय-सारणी' : 'My Schedule', icon: '▦' },
-    { to: '/documents', label: language === 'hi' ? 'दस्तावेज़ एवं तत्परता' : 'Documents & Readiness', icon: '▧' },
-    { to: '/deficiencies', label: language === 'hi' ? 'कमियां एवं प्रत्युत्तर' : 'Deficiencies & Responses', icon: '⚑' },
-    { to: '/notifications', label: language === 'hi' ? 'सूचनाएं' : 'Notifications', icon: '♧' },
-    { to: '/guide', label: language === 'hi' ? 'प्रक्रिया मार्गदर्शिका' : 'Help / Process Guide', icon: 'ⓘ' },
-  ];
+  // Submenu collapse/expand state (all open by default as requested)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    'app-processing': true,
+    'compliance-oversight': true,
+    'help-reference': true,
+  });
 
-  const officerNav = [
-    { to: '/', label: language === 'hi' ? 'डैशबोर्ड' : 'Dashboard', icon: '⌂' },
-    { to: '/applications', label: language === 'hi' ? 'आवेदन' : 'Applications', icon: '▤' },
-    { to: '/scheduling', label: language === 'hi' ? 'समय-निर्धारण' : 'Scheduling', icon: '▦' },
-    { to: '/documents', label: language === 'hi' ? 'दस्तावेज़ संवीक्षा' : 'Document Readiness', icon: '▧' },
-    { to: '/deficiencies', label: language === 'hi' ? 'कमियां (त्रुटियां)' : 'Deficiencies', icon: '⚑' },
-    { to: '/evc', label: 'EVC Management', icon: '◇' },
-    { to: '/compliance', label: 'Compliance', icon: '▣' },
-    { to: '/notifications', label: language === 'hi' ? 'सूचनाएं' : 'Notifications', icon: '♧' },
-    { to: '/audit', label: language === 'hi' ? 'लेखा परीक्षा इतिहास' : 'Audit History', icon: '◷' },
-    { to: '/guide', label: language === 'hi' ? 'मार्गदर्शिका' : 'Process Guide', icon: 'ⓘ' },
-    { to: '/workflow', label: 'Workflow / BPMN', icon: '⚙' },
-  ];
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
-  const navItems = isApplicant ? applicantNav : officerNav;
+  // Exactly aligned with user's requested order:
+  // 1. Dashboard (standalone, top level)
+  // 2. Application Processing (with submenus: Applications, Document Readiness, Scheduling, Deficiencies)
+  // 3. Compliance & Oversight (with submenus: EVC Management, Compliance, Audit History)
+  // 4. Notifications (standalone, so alerts stay one click away)
+  // 5. Help & Reference (with submenus: Process Guide, Workflow / BPMN)
+  const navEntries: NavEntry[] = [
+    // 1. Dashboard (standalone, top level)
+    {
+      id: 'dashboard',
+      type: 'standalone',
+      to: '/',
+      label: isApplicant ? t('nav_my_dashboard') : t('nav_dashboard'),
+      icon: '⌂',
+    },
+
+    // 2. Application Processing
+    {
+      id: 'app-processing',
+      type: 'group',
+      label: t('nav_app_processing'),
+      icon: '📑',
+      items: [
+        {
+          to: '/applications',
+          label: isApplicant ? t('nav_my_applications') : t('nav_applications'),
+        },
+        {
+          to: '/documents',
+          label: isApplicant ? t('nav_my_doc_readiness') : t('nav_doc_readiness'),
+        },
+        {
+          to: isApplicant ? '/schedule' : '/scheduling',
+          label: isApplicant ? t('nav_my_schedule') : t('nav_scheduling'),
+        },
+        {
+          to: '/deficiencies',
+          label: isApplicant ? t('nav_my_deficiencies') : t('nav_deficiencies'),
+        },
+      ],
+    },
+
+    // 3. Compliance & Oversight
+    {
+      id: 'compliance-oversight',
+      type: 'group',
+      label: t('nav_compliance_oversight'),
+      icon: '🛡',
+      items: [
+        {
+          to: '/evc',
+          label: t('nav_evc'),
+        },
+        {
+          to: '/compliance',
+          label: t('nav_compliance'),
+        },
+        {
+          to: '/audit',
+          label: t('nav_audit'),
+        },
+      ],
+    },
+
+    // 4. Notifications (standalone, so alerts stay one click away)
+    {
+      id: 'notifications',
+      type: 'standalone',
+      to: '/notifications',
+      label: t('nav_notifications'),
+      icon: '♧',
+      badge: !notificationsRead ? 3 : undefined,
+    },
+
+    // 5. Help & Reference
+    {
+      id: 'help-reference',
+      type: 'group',
+      label: t('nav_help_reference'),
+      icon: 'ⓘ',
+      items: [
+        {
+          to: '/guide',
+          label: t('nav_process_guide'),
+        },
+        {
+          to: '/workflow',
+          label: t('nav_workflow_bpmn'),
+        },
+      ],
+    },
+  ];
 
   // Resolve breadcrumb title
   const getCrumbTitle = () => {
     const path = location.pathname;
-    if (path === '/') return isApplicant ? (language === 'hi' ? 'मेरा डैशबोर्ड' : 'My Dashboard') : (language === 'hi' ? 'डैशबोर्ड' : 'Dashboard');
+    if (path === '/') return isApplicant ? t('nav_my_dashboard') : t('nav_dashboard');
     if (path.startsWith('/applications/new')) return language === 'hi' ? 'नया आवेदन' : 'New Application';
     if (path.startsWith('/applications/') || path === '/case') return language === 'hi' ? 'मामला फ़ाइल' : 'Case File';
-    if (path.startsWith('/applications')) return language === 'hi' ? 'आवेदन' : 'Applications';
-    if (path.startsWith('/schedule') || path.startsWith('/scheduling')) return isApplicant ? (language === 'hi' ? 'मेरी समय-सारणी' : 'My Schedule') : (language === 'hi' ? 'समय-निर्धारण' : 'Scheduling');
-    if (path.startsWith('/documents')) return isApplicant ? (language === 'hi' ? 'दस्तावेज़ तत्परता' : 'Documents & Readiness') : (language === 'hi' ? 'दस्तावेज़ संवीक्षा' : 'Document Readiness');
-    if (path.startsWith('/compliance')) return 'Compliance & Undertakings';
-    if (path.startsWith('/deficiencies')) return language === 'hi' ? 'कमियां एवं प्रत्युत्तर' : 'Deficiencies & Responses';
-    if (path.startsWith('/evc')) return 'EVC Management';
-    if (path.startsWith('/notifications')) return language === 'hi' ? 'सूचनाएं एवं समय-सीमाएं' : 'Notifications & Deadlines';
-    if (path.startsWith('/audit')) return language === 'hi' ? 'लेखा परीक्षा इतिहास' : 'Audit History';
-    if (path.startsWith('/guide')) return language === 'hi' ? 'प्रक्रिया मार्गदर्शिका' : 'Process Guide';
-    if (path.startsWith('/workflow')) return 'BPMN Workflow Showcase';
+    if (path.startsWith('/applications')) return isApplicant ? t('nav_my_applications') : t('nav_applications');
+    if (path.startsWith('/schedule') || path.startsWith('/scheduling')) return isApplicant ? t('nav_my_schedule') : t('nav_scheduling');
+    if (path.startsWith('/documents')) return isApplicant ? t('nav_my_doc_readiness') : t('nav_doc_readiness');
+    if (path.startsWith('/compliance')) return t('nav_compliance');
+    if (path.startsWith('/deficiencies')) return isApplicant ? t('nav_my_deficiencies') : t('nav_deficiencies');
+    if (path.startsWith('/evc')) return t('nav_evc');
+    if (path.startsWith('/notifications')) return t('nav_notifications');
+    if (path.startsWith('/audit')) return t('nav_audit');
+    if (path.startsWith('/guide')) return t('nav_process_guide');
+    if (path.startsWith('/workflow')) return t('nav_workflow_bpmn');
     return 'Overview';
   };
 
@@ -87,17 +192,78 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <div className="navlabel">{language === 'hi' ? 'कार्यक्षेत्र' : 'WORKSPACE'}</div>
 
         <nav className="nav" id="nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => (isActive ? 'active' : '')}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <span className="ico" aria-hidden="true">{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {navEntries.map((entry) => {
+            if (entry.type === 'standalone') {
+              return (
+                <NavLink
+                  key={entry.id}
+                  to={entry.to}
+                  end={entry.to === '/'}
+                  className={({ isActive }) => (isActive ? 'active' : '')}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span className="ico" aria-hidden="true">{entry.icon}</span>
+                  <span style={{ flex: 1 }}>{entry.label}</span>
+                  {entry.badge && (
+                    <span
+                      style={{
+                        background: 'var(--red)',
+                        color: 'white',
+                        borderRadius: '99px',
+                        padding: '1px 6px',
+                        fontSize: '10px',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {entry.badge}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            }
+
+            // Group with Submenus
+            const isOpen = openGroups[entry.id] ?? true;
+            const hasActiveChild = entry.items.some((item) => {
+              if (item.to === '/') return location.pathname === '/';
+              return location.pathname.startsWith(item.to);
+            });
+
+            return (
+              <div key={entry.id} className="nav-group">
+                <button
+                  type="button"
+                  className={`nav-group-header ${hasActiveChild ? 'has-active' : ''}`}
+                  onClick={() => toggleGroup(entry.id)}
+                  aria-expanded={isOpen}
+                >
+                  <div className="nav-group-title">
+                    <span className="ico" aria-hidden="true">{entry.icon}</span>
+                    <span>{entry.label}</span>
+                  </div>
+                  <span className="nav-group-chevron">
+                    {isOpen ? '▾' : '▸'}
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="nav-submenu">
+                    {entry.items.map((sub) => (
+                      <NavLink
+                        key={sub.to}
+                        to={sub.to}
+                        className={({ isActive }) => (isActive ? 'active' : '')}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <span className="sub-bullet">•</span>
+                        <span>{sub.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="side-bottom">

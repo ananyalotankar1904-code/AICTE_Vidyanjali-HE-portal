@@ -1,7 +1,85 @@
 export type Language = 'en' | 'hi';
 
 export const translations: Record<string, Record<Language, string>> = {
-  // Navigation & Shell
+  // Navigation Groups & Items matching user's requested order
+  'nav_dashboard': {
+    en: 'Dashboard',
+    hi: 'डैशबोर्ड',
+  },
+  'nav_my_dashboard': {
+    en: 'My Dashboard',
+    hi: 'मेरा डैशबोर्ड',
+  },
+  'nav_app_processing': {
+    en: 'Application Processing',
+    hi: 'आवेदन प्रसंस्करण',
+  },
+  'nav_applications': {
+    en: 'Applications',
+    hi: 'आवेदन',
+  },
+  'nav_my_applications': {
+    en: 'My Applications',
+    hi: 'मेरे आवेदन',
+  },
+  'nav_doc_readiness': {
+    en: 'Document Readiness',
+    hi: 'दस्तावेज़ संवीक्षा',
+  },
+  'nav_my_doc_readiness': {
+    en: 'Documents & Readiness',
+    hi: 'दस्तावेज़ एवं तत्परता',
+  },
+  'nav_scheduling': {
+    en: 'Scheduling',
+    hi: 'समय-निर्धारण',
+  },
+  'nav_my_schedule': {
+    en: 'My Schedule',
+    hi: 'मेरी समय-सारणी',
+  },
+  'nav_deficiencies': {
+    en: 'Deficiencies',
+    hi: 'कमियां (त्रुटियां)',
+  },
+  'nav_my_deficiencies': {
+    en: 'Deficiencies & Responses',
+    hi: 'कमियां एवं प्रत्युत्तर',
+  },
+  'nav_compliance_oversight': {
+    en: 'Compliance & Oversight',
+    hi: 'अनुपालन एवं पर्यवेक्षण',
+  },
+  'nav_evc': {
+    en: 'EVC Management',
+    hi: 'ईवीसी प्रबंधन',
+  },
+  'nav_compliance': {
+    en: 'Compliance',
+    hi: 'अनुपालन सूची',
+  },
+  'nav_audit': {
+    en: 'Audit History',
+    hi: 'लेखा परीक्षा इतिहास',
+  },
+  'nav_notifications': {
+    en: 'Notifications',
+    hi: 'सूचनाएं',
+  },
+  'nav_help_reference': {
+    en: 'Help & Reference',
+    hi: 'सहायता एवं संदर्भ',
+  },
+  'nav_process_guide': {
+    en: 'Process Guide',
+    hi: 'प्रक्रिया मार्गदर्शिका',
+  },
+  'nav_workflow_bpmn': {
+    en: 'Workflow / BPMN',
+    hi: 'वर्कफ़्लो / बीपीएमएन',
+  },
+
+  // Shell & Global
   'cycle_demo': {
     en: '✧   Cycle 2026–27 · Illustrative Demo',
     hi: '✧   सत्र 2026–27 · सांकेतिक डेमो',
@@ -401,4 +479,3 @@ export const getTranslation = (key: string, lang: Language): string => {
   }
   return key;
 };
-

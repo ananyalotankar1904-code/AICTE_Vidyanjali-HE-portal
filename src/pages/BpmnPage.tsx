@@ -33,7 +33,8 @@ export const BpmnPage: React.FC = () => {
           title="BPMN Showcase Simulator"
           style={{
             width: '100%',
-            height: '750px',
+            height: 'calc(100vh - 210px)',
+            minHeight: '820px',
             border: 'none',
             display: 'block',
           }}

@@ -1,466 +1,565 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  FileText,
-  Clock,
-  AlertTriangle,
-  Calendar,
-  ShieldAlert,
-  ChevronRight,
-  TrendingUp,
-  AlertCircle,
-  RefreshCw,
-} from 'lucide-react';
-import { Card, CardHeader } from '../components/common/Card';
-import { Button } from '../components/common/Button';
-import { Badge } from '../components/common/Badge';
-import { Skeleton } from '../components/common/Skeleton';
-import { useStore } from '../hooks/useStore';
-import { apiClient } from '../api/client';
-import { WORKFLOW_STAGES, ApplicationRecord, AuditEvent, DashboardSummary } from '../types';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from 'recharts';
+import { usePortal, ROLES } from '../context/PortalContext';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useStore();
+  const {
+    role,
+    language,
+    t,
+    appId,
+    institutionName,
+    slotRescheduled,
+    rescheduleRequested,
+    deficiencyStatus,
+    documents,
+    openDialog,
+    submitRescheduleRequest,
+    showToast,
+  } = usePortal();
 
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const isApplicant = role === ROLES[0];
+  const isHi = language === 'hi';
 
-  const fetchDashboardData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [sumRes, appsRes, auditRes] = await Promise.all([
-        apiClient.getDashboardSummary(),
-        apiClient.getApplications(),
-        apiClient.getAuditLogs().catch(() => []),
-      ]);
-      setSummary(sumRes);
-      setApplications(appsRes);
-      setAuditLogs(auditRes);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to connect to unified AICTE backend API.');
-    } finally {
-      setIsLoading(false);
-    }
+  // Helper for Requesting Slot dialog
+  const handleRequestSlot = () => {
+    let reasonVal = '';
+    let preferredVal = '';
+
+    openDialog({
+      title: isHi ? 'भिन्न समय-स्लॉट का अनुरोध करें' : 'Request a different slot',
+      children: (
+        <div>
+          <p>
+            {isHi
+              ? 'मूल नियुक्ति तब तक पुष्टीकृत रहेगी जब तक नया समय स्वीकृत न हो जाए।'
+              : 'The original appointment remains confirmed until a replacement is confirmed.'}
+          </p>
+          <label htmlFor="reason">{isHi ? 'कारण' : 'Reason'}</label>
+          <textarea
+            id="reason"
+            placeholder={isHi ? 'विवरण दें कि अन्य समय की आवश्यकता क्यों है' : 'Describe why another time is needed'}
+            onChange={(e) => {
+              reasonVal = e.target.value;
+            }}
+          />
+          <label htmlFor="preferred">{isHi ? 'पसंदीदा तिथि एवं समय' : 'Preferred date and time'}</label>
+          <input
+            id="preferred"
+            type="datetime-local"
+            onChange={(e) => {
+              preferredVal = e.target.value;
+            }}
+          />
+        </div>
+      ),
+      confirmLabel: isHi ? 'अनुरोध प्रस्तुत करें' : 'Submit mock request',
+      notice: isHi ? 'यह कार्रवाई केवल स्थानीय डेमो स्थिति को बदलती है।' : 'This action changes local demo state only.',
+      onConfirm: () => {
+        if (!reasonVal || !preferredVal) {
+          showToast(isHi ? 'कृपया कारण एवं पसंदीदा समय भरें।' : 'Add a reason and preferred time.');
+          return;
+        }
+        submitRescheduleRequest(reasonVal, preferredVal);
+      },
+    });
   };
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Reusable Event Component matching sih_final.html
+  const renderEvent = () => (
+    <div className="event">
+      <div className="datebox">
+        <small>{isHi ? 'नवंबर' : 'NOV'}</small>
+        <b>{slotRescheduled ? '06' : '05'}</b>
+      </div>
+      <div>
+        <strong>{t('online_scrutiny_meeting')}</strong>
+        <p>
+          {slotRescheduled ? t('meeting_time_06') : t('meeting_time_05')}
+        </p>
+        <span className="badge blue">
+          {slotRescheduled ? t('rescheduled') : t('confirmed')}
+        </span>{' '}
+        <p>{t('joining_link_na')}</p>
+      </div>
+    </div>
+  );
 
-  const counts = {
-    total: summary?.totalApplications ?? applications.length,
-    pendingScrutiny: summary?.pendingScrutiny ?? applications.filter((a) => a.status === 'Pending scrutiny').length,
-    deficiencyCases: summary?.deficiencyCases ?? applications.filter((a) => Boolean(a.deficiency)).length,
-    evcsScheduled: summary?.evcsScheduled ?? 0,
-    expiringDocs: summary?.expiringDocuments ?? 0,
-    upcomingDeadlines: summary?.upcomingDeadlines ?? applications.filter((a) => a.deadline <= '2026-11-09').length,
+  // Reusable Progress Stepper matching sih_final.html
+  const renderProgress = () => {
+    const steps = [
+      { key: 'step_submitted', label: t('step_submitted') },
+      { key: 'step_validation', label: t('step_validation') },
+      { key: 'step_scrutiny', label: t('step_scrutiny') },
+      { key: 'step_review', label: t('step_review') },
+      { key: 'step_decision', label: t('step_decision') },
+    ];
+    return (
+      <>
+        <div className="progress">
+          {steps.map((s, i) => (
+            <div
+              key={s.key}
+              className={`step ${i < 2 ? 'done' : i === 2 ? 'current' : ''}`}
+            >
+              <i>{i < 2 ? '✓' : i + 1}</i>
+              {s.label}
+            </div>
+          ))}
+        </div>
+        <p className="notice">
+          {t('evc_notice')}
+        </p>
+      </>
+    );
   };
 
-  // Coordinated gold and warm amber shades for distinguishing data series
-  const ageingColors = ['#F4C542', '#E5B530', '#D99A13', '#C4850C', '#A86A03'];
+  // 1. APPLICANT DASHBOARD
+  if (isApplicant) {
+    const verifiedDocCount = Object.values(documents).filter((v) => v === 'Verified').length;
+    const totalDocCount = Object.keys(documents).length;
+    const openDeficiencyCount = deficiencyStatus === 'REVIEWED' ? 0 : 1;
 
-  const ageingData = summary?.ageingBuckets && summary.ageingBuckets.length > 0
-    ? summary.ageingBuckets.map((b) => ({ range: b.bucket, count: b.count }))
-    : [
-        { range: '0–15 days', count: applications.filter((a) => a.age <= 15).length },
-        { range: '16–30 days', count: applications.filter((a) => a.age > 15 && a.age <= 30).length },
-        { range: '31–45 days', count: applications.filter((a) => a.age > 30 && a.age <= 45).length },
-        { range: '46–60 days', count: applications.filter((a) => a.age > 45 && a.age <= 60).length },
-        { range: '60+ days', count: applications.filter((a) => a.age > 60).length },
-      ];
+    return (
+      <div>
+        <div className="pagehead">
+          <div>
+            <div className="eyebrow">{isHi ? 'एआईसीटीई अनुमोदन एवं अनुपालन' : 'AICTE APPROVAL & COMPLIANCE'}</div>
+            <h1>{t('applicant_greeting')}</h1>
+            <p>{t('applicant_subtitle')}</p>
+          </div>
+          <button className="btn primary" onClick={() => navigate('/case')}>
+            {t('open_my_app')}
+          </button>
+        </div>
 
-  const attentionCases = applications
-    .filter((a) => Boolean(a.deficiency) || a.status === 'Pending scrutiny')
-    .slice(0, 4);
+        <div className="banner">
+          <span>⚑</span>
+          <div style={{ flex: 1 }}>
+            <strong>{t('action_needed_deficiency_title')}</strong>
+            <p>{t('action_needed_deficiency_desc')}</p>
+          </div>
+          <button className="btn text" onClick={() => navigate('/deficiencies')}>
+            {t('review_notice')}
+          </button>
+        </div>
 
-  const recentAudit = auditLogs.slice(0, 5);
+        {/* 4 Metric Cards */}
+        <div className="grid metrics">
+          <div className="card metric">
+            <div className="label">{t('my_applications')}</div>
+            <strong>1</strong>
+            <small>{t('cycle_badge')}</small>
+          </div>
+          <div className="card metric">
+            <div className="label">{t('current_stage')}</div>
+            <strong>{t('scrutiny')}</strong>
+            <small>{t('in_progress')}</small>
+          </div>
+          <div className="card metric">
+            <div className="label">{t('documents_ready')}</div>
+            <strong>
+              {isHi
+                ? `${totalDocCount} में से ${verifiedDocCount}`
+                : `${verifiedDocCount} of ${totalDocCount}`}
+            </strong>
+            <small>{t('meeting_docs_verified')}</small>
+          </div>
+          <div className="card metric">
+            <div className="label">{t('open_deficiencies')}</div>
+            <strong>{openDeficiencyCount}</strong>
+            <small>{t('response_due_date')}</small>
+          </div>
+        </div>
 
-  const formatDate = (dateStr: string) => {
-    if (dateStr === '—') return '—';
-    try {
-      return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
+        {/* Columns Layout */}
+        <div className="grid columns">
+          {/* Left Stack */}
+          <div className="stack">
+            {/* My Application Card */}
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('my_application_card')}</h2>
+              </div>
+              <div className="meta">
+                <span>{appId}</span>
+                <span className="badge blue">{t('in_scrutiny_badge')}</span>
+                <span className="badge">{t('synthetic_demo_badge')}</span>
+              </div>
+              <div className="case-title">{institutionName}</div>
+              <div className="meta">
+                <span>{t('app_type_eoa')}</span>
+                <span>{t('owner_scrutiny_officer')}</span>
+              </div>
+              {renderProgress()}
+              <hr className="divider" />
+              <div className="listrow">
+                <div>
+                  <strong>{t('next_action')}</strong>
+                  <small>{t('next_action_desc')}</small>
+                </div>
+                <button className="btn text" onClick={() => navigate('/case')}>
+                  {t('open_case')}
+                </button>
+              </div>
+            </section>
+
+            {/* Next Scheduled Event Card */}
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('next_scheduled_event')}</h2>
+              </div>
+              {renderEvent()}
+              <hr className="divider" />
+              <div className="buttonrow">
+                <button className="btn" onClick={() => navigate('/schedule')}>
+                  {t('view_schedule')}
+                </button>
+                <button className="btn" onClick={handleRequestSlot}>
+                  {t('request_rescheduling')}
+                </button>
+              </div>
+              {rescheduleRequested && (
+                <p className="notice">
+                  {t('reschedule_requested_notice')}
+                </p>
+              )}
+            </section>
+
+            {/* Preparation Checklist */}
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('prep_checklist')}</h2>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('confirm_reps')}</strong>
+                  <small>{t('reps_desc')}</small>
+                </div>
+                <span className="badge amber">{t('todo')}</span>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('complete_meeting_docs')}</strong>
+                  <small>{t('review_docs_desc')}</small>
+                </div>
+                <button className="btn text" onClick={() => navigate('/documents')}>
+                  {t('view_docs')}
+                </button>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('review_deficiency_notice')}</strong>
+                  <small>{t('response_due_12_nov')}</small>
+                </div>
+                <button className="btn text" onClick={() => navigate('/deficiencies')}>
+                  {t('respond')}
+                </button>
+              </div>
+            </section>
+          </div>
+
+          {/* Right Stack */}
+          <div className="stack">
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('inst_profile')}</h2>
+              </div>
+              <strong>{institutionName}</strong>
+              <p className="muted">{t('inst_sub')}</p>
+              <div className="listrow">
+                <div>
+                  <small>{t('inst_id')}</small>
+                  <strong>DEMO-INST-01</strong>
+                </div>
+                <span className="badge">{t('demo_account')}</span>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('doc_readiness')}</h2>
+              </div>
+              <strong>
+                {isHi
+                  ? `4 में से ${verifiedDocCount} सत्यापित`
+                  : `${verifiedDocCount} of ${totalDocCount} verified`}
+              </strong>
+              <div className="bar">
+                <span style={{ width: `${(verifiedDocCount / totalDocCount) * 100}%` }}></span>
+              </div>
+              <p className="muted">{t('doc_missing_note')}</p>
+              <button className="btn text" onClick={() => navigate('/documents')}>
+                {t('manage_docs')}
+              </button>
+            </section>
+
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('upcoming_deadlines')}</h2>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('deficiency_response')}</strong>
+                  <small>12 November 2026</small>
+                </div>
+                <span className="badge amber">{t('due_soon')}</span>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('meeting_prep')}</strong>
+                  <small>{t('before_05_nov')}</small>
+                </div>
+                <span className="badge blue">{t('upcoming')}</span>
+              </div>
+            </section>
+
+            <section className="card">
+              <div className="cardhead">
+                <h2>{t('notifications')}</h2>
+              </div>
+              <div className="listrow">
+                <div>
+                  <strong>{t('meeting_confirmed_notif')}</strong>
+                  <small>{t('today_linked')} {appId}</small>
+                </div>
+                <span className="badge blue">{t('unread')}</span>
+              </div>
+              <button className="btn text" onClick={() => navigate('/notifications')}>
+                {t('view_notifications')}
+              </button>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. OFFICER DASHBOARDS
+  const officerConfigs: Record<string, [string, string, string, string, string]> = {
+    'Intake Officer': [
+      'Intake overview',
+      'New submissions',
+      'Incomplete applications',
+      'Awaiting validation',
+      'Due-soon cases',
+    ],
+    'Scrutiny Officer': [
+      isHi ? 'संवीक्षा अवलोकन' : 'Scrutiny overview',
+      isHi ? 'संवीक्षा हेतु लंबित' : 'Pending scrutiny',
+      isHi ? 'पुनः संवीक्षा हेतु लंबित' : 'Pending re-scrutiny',
+      isHi ? 'खुली कमियां (त्रुटियां)' : 'Open deficiencies',
+      isHi ? 'आज की बैठकें' : 'Meetings today',
+    ],
+    'EVC Coordinator': [
+      'Inspection overview',
+      'Needs scheduling',
+      'Scheduled visits',
+      'Reports pending',
+      'Completed inspections',
+    ],
+    'Committee Secretariat': [
+      'Committee overview',
+      'Awaiting review',
+      'Incomplete packs',
+      'Scheduled reviews',
+      'Clarifications',
+    ],
+    'Competent Authority Secretariat': [
+      'Decision overview',
+      'Ready for decision',
+      'Unresolved prerequisites',
+      'Outstanding conditions',
+      'Recent decisions',
+    ],
   };
+
+  const config = officerConfigs[role] || officerConfigs['Scrutiny Officer'];
+  const isCompetentAuthority = role === 'Competent Authority Secretariat';
 
   return (
     <div>
-      {/* Page Header */}
-      <div className="page-head">
+      <div className="pagehead">
         <div>
-          <div className="eyebrow">Approval Command Centre</div>
-          <h1 className="page-title">Welcome back, {currentUser.name}</h1>
-          <p className="page-subtitle">
-            A clear operational overview of what is progressing, who acts next, and where compliance
-            may require scrutiny in AICTE_Vidyanjali-HE-portal.
+          <div className="eyebrow">{isHi ? 'एआईसीटीई अनुमोदन एवं अनुपालन' : 'AICTE APPROVAL & COMPLIANCE'}</div>
+          <h1>{config[0]}</h1>
+          <p>
+            {role === 'Scrutiny Officer' && isHi
+              ? t('scrutiny_sub')
+              : `Manage your ${role.toLowerCase()} work queue for the 2026–27 cycle.`}
           </p>
         </div>
-        <div className="head-actions">
-          <Button
-            onClick={() => navigate('/applications/new')}
-            variant="secondary"
-          >
-            Start New Intake
-          </Button>
-          <Button
-            onClick={() => navigate('/applications')}
-            icon={<ChevronRight size={16} />}
-            iconPosition="right"
-          >
-            Review Applications
-          </Button>
-        </div>
+        <button className="btn" onClick={() => navigate('/applications')}>
+          {t('open_app_registry')}
+        </button>
       </div>
 
-      {/* Degraded mode warning if Member 4 compliance subsystem is offline */}
-      {summary?.degraded && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '12px 16px',
-            backgroundColor: '#FFFBEB',
-            border: '1px solid #FDE68A',
-            borderRadius: '8px',
-            color: '#92400E',
-            marginBottom: '20px',
-            fontSize: '14px',
-          }}
-        >
-          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
-          <div>
-            <strong>Compliance Subsystem Degraded:</strong> Member 4 compliance service is unreachable or returning errors. Core workflow metrics remain active while compliance numbers use fallback defaults.
-          </div>
-        </div>
-      )}
-
-      {/* Honest error display if backend connection fails */}
-      {error && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '36px 20px',
-            background: '#FFF5F5',
-            border: '1px solid #FED7D7',
-            borderRadius: '8px',
-            marginBottom: '24px',
-            textAlign: 'center',
-          }}
-        >
-          <AlertCircle size={36} color="#E53E3E" style={{ marginBottom: '12px' }} />
-          <h3 style={{ color: '#C53030', margin: '0 0 8px' }}>Live API Connection Failed</h3>
-          <p style={{ color: '#9B2C2C', maxWidth: '520px', fontSize: '14px', margin: '0 0 16px' }}>
-            {error}
+      <div className="banner">
+        <span>⚑</span>
+        <div style={{ flex: 1 }}>
+          <strong>
+            {isCompetentAuthority
+              ? 'Decision controls are restricted'
+              : t('case_attention_title')}
+          </strong>
+          <p>
+            {isCompetentAuthority
+              ? 'This demo does not grant authorization to make an official decision.'
+              : t('case_attention_desc')}
           </p>
-          <Button variant="secondary" onClick={fetchDashboardData} icon={<RefreshCw size={15} />}>
-            Retry Backend Connection
-          </Button>
         </div>
-      )}
+        <button className="btn text" onClick={() => navigate('/case')}>
+          {t('open_case')}
+        </button>
+      </div>
 
-      {/* Loading state */}
-      {isLoading ? (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          <div className="metric-grid">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i}>
-                <Skeleton lines={2} />
-              </Card>
-            ))}
+      {/* 4 Metrics */}
+      <div className="grid metrics">
+        {config.slice(1).map((title, i) => (
+          <div key={title} className="card metric">
+            <div className="label">{title}</div>
+            <strong>1</strong>
+            <small>{i === 3 ? t('illustrative_demo') : t('needs_attention')}</small>
           </div>
-          <div className="dashboard-grid">
-            <Card>
-              <Skeleton lines={4} />
-            </Card>
-            <Card>
-              <Skeleton lines={4} />
-            </Card>
-          </div>
+        ))}
+      </div>
+
+      {/* Columns */}
+      <div className="grid columns">
+        {/* Left Stack */}
+        <div className="stack">
+          <section className="card">
+            <div className="cardhead">
+              <h2>{t('my_work_queue')}</h2>
+            </div>
+            <p className="muted">{t('work_queue_desc')}</p>
+            <div className="tablewrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t('th_app_inst')}</th>
+                    <th>{t('th_stage_owner')}</th>
+                    <th>{t('th_readiness')}</th>
+                    <th>{t('th_deadline_slot')}</th>
+                    <th>{t('th_next_action')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td data-label={t('th_app_inst')}>
+                      <strong>{appId}</strong>
+                      <small>{institutionName}</small>
+                    </td>
+                    <td data-label={t('th_stage_owner')}>
+                      {t('scrutiny')}
+                      <small>{role === 'Scrutiny Officer' && isHi ? 'संवीक्षा अधिकारी' : role}</small>
+                    </td>
+                    <td data-label={t('th_readiness')}>
+                      <span className="badge amber">{isHi ? '4 में से 1 सत्यापित' : '1 of 4 verified'}</span>
+                      <small>
+                        {deficiencyStatus === 'RESPONSE_SUBMITTED'
+                          ? (isHi ? 'उत्तर प्रस्तुत किया गया' : 'Response submitted')
+                          : deficiencyStatus === 'REVIEWED'
+                          ? (isHi ? 'उत्तर की समीक्षा हुई' : 'Response reviewed')
+                          : (isHi ? 'कमी (त्रुटि) खुली है' : 'Deficiency open')}
+                      </small>
+                    </td>
+                    <td data-label={t('th_deadline_slot')}>
+                      12 Nov 2026
+                      <small>{isHi ? 'बैठक 05 नवंबर' : 'Meeting 05 Nov'}</small>
+                    </td>
+                    <td data-label={t('th_next_action')}>
+                      <button className="btn text" onClick={() => navigate('/case')}>
+                        {t('open_case')}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="cardhead">
+              <h2>{t('todays_schedule')}</h2>
+            </div>
+            {renderEvent()}
+            <hr className="divider" />
+            <button
+              className="btn text"
+              onClick={() => navigate(role === 'EVC Coordinator' ? '/evc' : '/scheduling')}
+            >
+              {t('open_scheduling')}
+            </button>
+          </section>
         </div>
-      ) : (
-        <>
-          {/* Metric Cards Grid — Pure White Cards with Golden/Warm Accents */}
-          <div className="metric-grid">
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Total Applications</span>
-                <span className="metric-icon-wrap">
-                  <FileText size={17} />
-                </span>
-              </div>
-              <div>
-                <div className="metric-value">{counts.total}</div>
-                <div className="metric-footer">Across 2026–27 approval cycle</div>
-              </div>
+
+        {/* Right Stack */}
+        <div className="stack">
+          <section className="card">
+            <div className="cardhead">
+              <h2>{t('upcoming_deadlines')}</h2>
             </div>
-
-            <div className="metric-card warn">
-              <div className="metric-top">
-                <span className="metric-label">Pending Scrutiny</span>
-                <span className="metric-icon-wrap">
-                  <Clock size={17} />
-                </span>
-              </div>
+            <div className="listrow">
               <div>
-                <div className="metric-value">{counts.pendingScrutiny}</div>
-                <div className="metric-footer">Officer review action required</div>
+                <strong>{t('deficiency_response')}</strong>
+                <small>{appId} · 12 Nov 2026</small>
               </div>
+              <span className="badge amber">{t('due_soon')}</span>
             </div>
+            <button className="btn text" onClick={() => navigate('/notifications')}>
+              {t('view_deadlines')}
+            </button>
+          </section>
 
-            <div className="metric-card danger">
-              <div className="metric-top">
-                <span className="metric-label">Deficiency Cases</span>
-                <span className="metric-icon-wrap">
-                  <AlertTriangle size={17} />
-                </span>
-              </div>
+          <section className="card">
+            <div className="cardhead">
+              <h2>{t('priority_actions')}</h2>
+            </div>
+            <div className="listrow">
               <div>
-                <div className="metric-value">{counts.deficiencyCases}</div>
-                <div className="metric-footer">Institution response awaiting</div>
+                <strong>
+                  {deficiencyStatus === 'RESPONSE_SUBMITTED'
+                    ? t('review_inst_response')
+                    : t('review_doc_readiness')}
+                </strong>
+                <small>{institutionName}</small>
               </div>
+              <button className="btn text" onClick={() => navigate('/deficiencies')}>
+                {t('open_action')}
+              </button>
             </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">EVCs Scheduled</span>
-                <span className="metric-icon-wrap">
-                  <Calendar size={17} />
-                </span>
-              </div>
+            <div className="listrow">
               <div>
-                <div className="metric-value">{counts.evcsScheduled}</div>
-                <div className="metric-footer">Upcoming inspections</div>
+                <strong>
+                  {rescheduleRequested
+                    ? t('review_reschedule_request')
+                    : t('review_scrutiny_appt')}
+                </strong>
+                <small>{appId}</small>
               </div>
+              <button className="btn text" onClick={() => navigate('/scheduling')}>
+                {t('open_action')}
+              </button>
             </div>
+          </section>
 
-            <div className="metric-card warn">
-              <div className="metric-top">
-                <span className="metric-label">Expiring Documents</span>
-                <span className="metric-icon-wrap">
-                  <ShieldAlert size={17} />
-                </span>
+          {isCompetentAuthority && (
+            <section className="card">
+              <div className="cardhead">
+                <h2>Decision authorization</h2>
               </div>
-              <div>
-                <div className="metric-value">{counts.expiringDocs}</div>
-                <div className="metric-footer">Expired or expiring within 30 days</div>
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Upcoming Deadlines</span>
-                <span className="metric-icon-wrap">
-                  <TrendingUp size={17} />
-                </span>
-              </div>
-              <div>
-                <div className="metric-value">{counts.upcomingDeadlines}</div>
-                <div className="metric-footer">Due within the next 15 days</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Analytical Charts — Coordinated Gold & Warm Amber Series */}
-          <div className="dashboard-grid">
-            <Card>
-              <CardHeader
-                title="Application Ageing Distribution"
-                subtitle="Days elapsed since initial submission across active portfolio"
-              />
-              <div style={{ width: '100%', height: 210, marginTop: 10 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ageingData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="range" tick={{ fontSize: 12, fill: '#867761' }} axisLine={{ stroke: '#E8DFC9' }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#867761' }} axisLine={{ stroke: '#E8DFC9' }} />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(244, 197, 66, 0.08)' }}
-                      contentStyle={{
-                        borderRadius: '8px',
-                        borderColor: '#E8DFC9',
-                        background: '#FFFFFF',
-                        color: '#514332',
-                        fontSize: '13px',
-                        boxShadow: '0 4px 12px rgba(81, 67, 50, 0.08)',
-                      }}
-                      formatter={(value: any) => [`${value} Applications`, 'Count']}
-                    />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {ageingData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={ageingColors[index % ageingColors.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Stage Distribution"
-                subtitle="Where active applications stand today"
-              />
-              <div className="stage-rows" style={{ marginTop: 12 }}>
-                {WORKFLOW_STAGES.slice(0, 5).map((stage, idx) => {
-                  const count = applications.filter((a) => a.stage === idx).length;
-                  const percentage = applications.length ? Math.round((count / applications.length) * 100) : 0;
-                  return (
-                    <div key={stage} className="stage-row">
-                      <span style={{ color: 'var(--ink)' }}>{stage}</span>
-                      <div className="stage-track">
-                        <div
-                          className="stage-fill"
-                          style={{ width: `${percentage}%` }}
-                          title={`${percentage}% of total`}
-                        />
-                      </div>
-                      <b style={{ textAlign: 'right', color: 'var(--ink)' }}>{count}</b>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
-
-          {/* Lower Split: Attention & Activity */}
-          <div className="split-lower">
-            <Card>
-              <CardHeader
-                title="Requires Attention"
-                subtitle="Cases with active deficiencies or pending scrutiny"
-                action={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/applications')}
-                    icon={<ChevronRight size={14} />}
-                    iconPosition="right"
-                  >
-                    View all
-                  </Button>
-                }
-              />
-
-              <div style={{ display: 'grid', gap: '8px' }}>
-                {attentionCases.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: 'var(--muted)', padding: '16px 0', textAlign: 'center' }}>
-                    No cases currently requiring immediate attention.
-                  </p>
-                ) : (
-                  attentionCases.map((app) => (
-                    <div
-                      key={app.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '14px',
-                        padding: '12px 0',
-                        borderTop: '1px solid var(--border-soft)',
-                      }}
-                    >
-                      <div>
-                        <button
-                          type="button"
-                          className="table-institution"
-                          onClick={() => navigate(`/applications/${app.id}`)}
-                        >
-                          {app.name}
-                        </button>
-                        <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>
-                          {app.owner} acts next · Target due {formatDate(app.deadline)}
-                        </div>
-                      </div>
-                      <Badge statusText={app.status}>{app.status}</Badge>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Recent Activity"
-                subtitle="Audited workflow state transitions"
-                action={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/audit')}
-                    icon={<ChevronRight size={14} />}
-                    iconPosition="right"
-                  >
-                    Full audit
-                  </Button>
-                }
-              />
-
-              <div className="audit-timeline">
-                {recentAudit.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: 'var(--muted)', padding: '16px 0', textAlign: 'center' }}>
-                    No recent workflow activity recorded.
-                  </p>
-                ) : (
-                  recentAudit.map((log) => (
-                    <div
-                      key={log.id}
-                      style={{
-                        position: 'relative',
-                        padding: '0 0 16px 20px',
-                        borderLeft: '1px solid var(--border)',
-                        marginLeft: '7px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: '-5px',
-                          top: '4px',
-                          width: '9px',
-                          height: '9px',
-                          background: 'var(--accent-active)',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          boxShadow: '0 0 0 1px var(--accent-border)',
-                        }}
-                      />
-                      <strong style={{ display: 'block', fontSize: '13px', lineHeight: 1.4 }}>
-                        {log.action} ·{' '}
-                        <span style={{ color: 'var(--accent-active)' }}>{log.app}</span>
-                      </strong>
-                      <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '2px 0 0' }}>
-                        {log.actor} · {log.at}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          </div>
-        </>
-      )}
+              <p>
+                Final decision controls require authorised production access. No statutory decision can be made in this demo.
+              </p>
+              <button className="btn" disabled>
+                Issue decision · Restricted
+              </button>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
